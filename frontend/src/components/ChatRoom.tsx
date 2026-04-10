@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { socket } from '@/lib/api';
 import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -85,36 +86,16 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
   useEffect(() => {
     fetchPosts();
-    const postsChannel = supabase
-      .channel(`room-${groupId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `group_id=eq.${groupId}` }, 
-        async (payload) => {
-          const { data: fullPost } = await supabase
-            .from('posts')
-            .select(`
-              *,
-              profiles (username),
-              reply_to:reply_to_id (
-                content,
-                profiles (username)
-              )
-            `)
-            .eq('id', payload.new.id)
-            .maybeSingle();
+    socket.emit('join_room', groupId);
 
-          if (fullPost) {
-            setPosts((prev) => [...prev, { ...fullPost, reactions: {}, user_reaction: null }]);
-          }
-        }
-      ).subscribe();
+    const handleRefresh = () => {
+      fetchPosts();
+    };
 
-    const reactionsChannel = supabase
-      .channel(`reactions-${groupId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, () => { fetchPosts(); }).subscribe();
+    socket.on('refresh_posts', handleRefresh);
 
     return () => {
-      supabase.removeChannel(postsChannel);
-      supabase.removeChannel(reactionsChannel);
+      socket.off('refresh_posts', handleRefresh);
     };
   }, [groupId, userId]);
 
@@ -193,6 +174,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       const { data: postData } = await supabase.from('posts').insert(insertData).select().maybeSingle();
       if (postData) {
         await supabase.from('history').insert({ user_id: userId, action_type: 'post_created', action_id: postData.id, metadata: { group_id: groupId } });
+        socket.emit('new_post', groupId);
         setNewPost('');
         setReplyingTo(null);
         setSelectedFiles([]);
@@ -215,6 +197,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       await supabase.from('reactions').insert({ post_id: postId, user_id: userId, emoji });
       await supabase.from('history').insert({ user_id: userId, action_type: 'reacted_to_post', action_id: postId, metadata: { emoji } });
     }
+    socket.emit('new_reaction', groupId);
   }
 
   const formatDateLabel = (dateStr: string) => {
