@@ -174,9 +174,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       const { data: postData } = await supabase.from('posts').insert(insertData).select().maybeSingle();
       if (postData) {
         await supabase.from('history').insert({ user_id: userId, action_type: 'post_created', action_id: postData.id, metadata: { group_id: groupId } });
-        
         socket.emit('new_post', groupId);
-        
         setNewPost('');
         setReplyingTo(null);
         setSelectedFiles([]);
@@ -199,7 +197,6 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       await supabase.from('reactions').insert({ post_id: postId, user_id: userId, emoji });
       await supabase.from('history').insert({ user_id: userId, action_type: 'reacted_to_post', action_id: postId, metadata: { emoji } });
     }
-    
     socket.emit('new_reaction', groupId);
   }
 

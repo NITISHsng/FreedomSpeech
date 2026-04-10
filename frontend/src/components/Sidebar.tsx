@@ -86,7 +86,6 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
 
     fetchHistory();
 
-    // Reusing the general refresh endpoint for user dashboard notifications
     const handleHistoryRefresh = () => {
       fetchHistory();
     };

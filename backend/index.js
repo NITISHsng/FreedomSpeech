@@ -1,4 +1,3 @@
-// FreedomSpeech Backend v2.6 - Socket.IO Enabled
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
