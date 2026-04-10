@@ -8,7 +8,7 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error('❌ Error: DATABASE_URL is not set in .env file.');
   console.log('Please add your Supabase connection string to .env, e.g.:');
-  console.log('DATABASE_URL=postgresql://postgres:[password]@db.quorqmrjjbolwrdussah.supabase.co:5432/postgres');
+  console.log('DATABASE_URL=postgresql://postgres:N1715H@database@db.quorqmrjjbolwrdussah.supabase.co:5432/postgres');
   process.exit(1);
 }
 
