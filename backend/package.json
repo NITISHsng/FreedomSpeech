@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "init-db": "node apply-schema.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,8 +15,7 @@
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
-    "express": "^5.2.1",
-    "postgres": "^3.4.9"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
