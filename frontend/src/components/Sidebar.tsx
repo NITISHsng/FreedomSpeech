@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
-import { socket } from '@/lib/api';
+import { socket, fetchAPI } from '@/lib/api';
 import { 
   Zap, Hash, Plus, Loader2, X, ArrowRight, Settings, 
   Search, History, Globe, LogOut 
@@ -53,8 +52,12 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
   }, []);
 
   const fetchGroups = useCallback(async () => {
-    const { data } = await supabase.from('groups').select('*');
-    if (data) setGroups(data);
+    try {
+      const data = await fetchAPI('/api/groups');
+      if (data) setGroups(data);
+    } catch (err) {
+      console.error("Failed to fetch groups via API:", err);
+    }
   }, []);
 
   useEffect(() => {
@@ -75,13 +78,12 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
     if (!userId) return;
 
     async function fetchHistory() {
-      const { data } = await supabase
-        .from('history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (data) setHistory(data);
+      try {
+        const data = await fetchAPI(`/api/history?userId=${userId}`);
+        if (data) setHistory(data);
+      } catch (err) {
+        console.error("Failed to fetch history via API:", err);
+      }
     }
 
     fetchHistory();
@@ -133,28 +135,23 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
       return;
     }
 
-    const { data, error: insertError } = await supabase
-      .from('groups')
-      .insert({
-        name: newBoothName.trim(),
-        slug: slug,
-        description: `Shared area for ${newBoothName.trim()}`
-      })
-      .select()
-      .maybeSingle();
+    try {
+      const data = await fetchAPI('/api/groups', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newBoothName.trim(),
+          slug: slug,
+          description: `Shared area for ${newBoothName.trim()}`
+        })
+      });
 
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setError("Name already exists");
-      } else {
-        setError("Creation failed. Please try again.");
+      if (data) {
+        setNewBoothName('');
+        setIsInputVisible(false);
+        handleGroupClick(data.id);
       }
-    } else if (data) {
-      setNewBoothName('');
-      setIsInputVisible(false);
-      setGroups(prev => [...prev, data as Group]);
-      handleGroupClick(data.id);
-      socket.emit('group_update');
+    } catch (err) {
+      setError("Creation failed. Please try again.");
     }
     
     setIsCreating(false);

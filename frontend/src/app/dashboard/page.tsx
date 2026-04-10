@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatRoom } from '@/components/ChatRoom';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
-import { supabase } from '@/lib/supabase';
-import { Plus, Database, AlertCircle } from 'lucide-react';
+import { Plus, AlertCircle } from 'lucide-react';
+import { fetchAPI } from '@/lib/api';
 
 export default function Dashboard() {
   const { userId } = useAnonymousUser();
@@ -19,34 +19,13 @@ export default function Dashboard() {
     setError(null);
 
     try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database Timeout')), 10000)
-      );
-
-      const fetchPromise = (async () => {
-        let { data: globalGroup } = await supabase
-          .from('groups')
-          .select('id')
-          .eq('slug', 'global')
-          .maybeSingle();
-        
-        if (globalGroup) return globalGroup.id;
-
-        const { data: anyGroup } = await supabase
-          .from('groups')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        
-        if (anyGroup) return anyGroup.id;
-        
-        return null;
-      })();
-
-      const result = await Promise.race([fetchPromise, timeoutPromise]) as string | null;
-
-      if (result) {
-        setActiveGroupId(result);
+      const groups = await fetchAPI('/api/groups');
+      const globalGroup = groups?.find((g: any) => g.slug === 'global');
+      
+      if (globalGroup) {
+        setActiveGroupId(globalGroup.id);
+      } else if (groups && groups.length > 0) {
+        setActiveGroupId(groups[0].id);
       } else {
         setError('No communities found. Please create your first community below.');
       }
@@ -66,17 +45,14 @@ export default function Dashboard() {
     setIsInitializing(true);
     setError(null);
     try {
-      const { data: newGroup, error: createError } = await supabase
-        .from('groups')
-        .insert({
+      const newGroup = await fetchAPI('/api/groups', {
+        method: 'POST',
+        body: JSON.stringify({
           name: 'Global Square',
           slug: 'global',
           description: 'The main community for everyone to speak freely.'
         })
-        .select()
-        .maybeSingle();
-
-      if (createError) throw createError;
+      });
 
       if (newGroup) {
         setActiveGroupId(newGroup.id);

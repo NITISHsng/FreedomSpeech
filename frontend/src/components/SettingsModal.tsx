@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Lock, Save, Loader2, CheckCircle2, Shield, Copy, Check } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { fetchAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
 interface SettingsModalProps {
   isOpen: boolean;
@@ -34,23 +34,20 @@ export function SettingsModal({ isOpen, onClose, userId, initialUsername, onUpda
     setSuccess(false);
 
     try {
-      const updates: any = { username: username.trim() };
-      if (password.trim()) {
-        updates.password = password.trim();
-      }
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
+      await fetchAPI('/api/profiles', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          id: userId, 
+          username: username.trim(),
+          ...(password.trim() && { password: password.trim() })
+        })
+      });
 
       setSuccess(true);
       onUpdate();
       setTimeout(() => {
         setSuccess(false);
-        if (!password.trim()) onClose(); // Close if just name changed
+        if (!password.trim()) onClose();
       }, 2000);
     } catch (err: any) {
       console.error('Update error:', err);

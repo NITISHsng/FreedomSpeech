@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/lib/supabase';
+import { fetchAPI } from '@/lib/api';
 
 export function useAnonymousUser() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -24,16 +24,15 @@ export function useAnonymousUser() {
 
   const fetchProfile = useCallback(async (id: string) => {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('username, password')
-        .eq('id', id)
-        .maybeSingle();
+      const data = await fetchAPI(`/api/profiles/${id}`);
       
       if (data) {
         if (!data.username) {
           const newName = generateRandomName();
-          await supabase.from('profiles').update({ username: newName }).eq('id', id);
+          await fetchAPI('/api/profiles', {
+            method: 'POST',
+            body: JSON.stringify({ id, username: newName })
+          });
           setProfile({ username: newName, password_set: !!data.password });
         } else {
           setProfile({
@@ -42,32 +41,26 @@ export function useAnonymousUser() {
           });
         }
       } else {
-        // Auto-register if ID exists in local but not in DB
+        // Auto-register via backend
         const newName = generateRandomName();
-        await supabase.from('profiles').insert({ id, username: newName });
+        await fetchAPI('/api/profiles', {
+            method: 'POST',
+            body: JSON.stringify({ id, username: newName })
+        });
         setProfile({ username: newName, password_set: false });
       }
     } catch (err) {
-      console.error("Profile fetch error:", err);
+      console.error("Profile fetch error via API:", err);
     }
   }, [generateRandomName]);
 
   const reclaimGhost = useCallback(async (id: string, password?: string) => {
     setIsLoaded(false);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, password, username')
-        .eq('id', id.trim())
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new Error("Ghost ID not found in the registry.");
-
-      // If a password is set, it must match
-      if (data.password && data.password !== password?.trim()) {
-        throw new Error("Invalid password for this Ghost ID.");
-      }
+      const data = await fetchAPI('/api/profiles/reclaim', {
+        method: 'POST',
+        body: JSON.stringify({ id, password })
+      });
 
       // Success - persist to new browser
       localStorage.setItem('freedom_user_id', data.id);
@@ -79,7 +72,7 @@ export function useAnonymousUser() {
       setIsLoaded(true);
       return data;
     } catch (err: any) {
-      console.error("Reclaim error:", err);
+      console.error("Reclaim error via API:", err);
       setIsLoaded(true);
       throw err;
     }
@@ -90,18 +83,17 @@ export function useAnonymousUser() {
     const defaultUsername = generateRandomName();
     
     try {
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('id, username, password')
-        .eq('id', idToRegister)
-        .maybeSingle();
+      const existing = await fetchAPI(`/api/profiles/${idToRegister}`).catch(() => null);
 
       if (existing) {
         localStorage.setItem('freedom_user_id', idToRegister);
         setUserId(idToRegister);
         
         if (!existing.username) {
-          await supabase.from('profiles').update({ username: defaultUsername }).eq('id', idToRegister);
+          await fetchAPI('/api/profiles', {
+            method: 'POST',
+            body: JSON.stringify({ id: idToRegister, username: defaultUsername })
+          });
           setProfile({ username: defaultUsername, password_set: !!existing.password });
         } else {
           setProfile({ username: existing.username, password_set: !!existing.password });
@@ -110,19 +102,18 @@ export function useAnonymousUser() {
         return idToRegister;
       }
 
-      const { error } = await supabase.from('profiles').insert({ id: idToRegister, username: defaultUsername });
+      await fetchAPI('/api/profiles', {
+        method: 'POST',
+        body: JSON.stringify({ id: idToRegister, username: defaultUsername })
+      });
 
-      if (!error) {
-        localStorage.setItem('freedom_user_id', idToRegister);
-        setUserId(idToRegister);
-        setProfile({ username: defaultUsername, password_set: false });
-        setIsLoaded(true);
-        return idToRegister;
-      } else {
-        throw error;
-      }
+      localStorage.setItem('freedom_user_id', idToRegister);
+      setUserId(idToRegister);
+      setProfile({ username: defaultUsername, password_set: false });
+      setIsLoaded(true);
+      return idToRegister;
     } catch (err) {
-      console.error("Registration error:", err);
+      console.error("Registration error via API:", err);
       setIsLoaded(true); 
     }
   }, [generateRandomName, getTimestampedId]);

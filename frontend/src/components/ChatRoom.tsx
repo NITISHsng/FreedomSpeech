@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { socket } from '@/lib/api';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { socket, fetchAPI } from '@/lib/api';
 import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -49,40 +48,20 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => setHasMounted(true), []);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     if (!groupId) return;
-    const { data: gData } = await supabase.from('groups').select('name').eq('id', groupId).maybeSingle();
-    if (gData) setGroupName(gData.name);
+    
+    try {
+      // Fetch group details via API
+      const gData = await fetchAPI(`/api/groups/${groupId}`);
+      if (gData) setGroupName(gData.name);
 
-    const { data } = await supabase
-      .from('posts')
-      .select(`
-        *,
-        profiles (username),
-        reply_to:reply_to_id (
-          content,
-          profiles (username)
-        ),
-        reactions (
-          emoji,
-          user_id
-        )
-      `)
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: true });
-
-    if (data) {
-      const processedPosts = data.map((post: any) => {
-        const reactionsMap: Record<string, number> = {};
-        post.reactions?.forEach((r: any) => {
-          reactionsMap[r.emoji] = (reactionsMap[r.emoji] || 0) + 1;
-        });
-        const userReaction = post.reactions?.find((r: any) => r.user_id === userId)?.emoji || null;
-        return { ...post, reactions: reactionsMap, user_reaction: userReaction };
-      });
-      setPosts(processedPosts);
+      const data = await fetchAPI(`/api/posts?groupId=${groupId}&userId=${userId}`);
+      if (data) setPosts(data);
+    } catch (err) {
+      console.error("Failed to fetch data via API:", err);
     }
-  };
+  }, [groupId, userId]);
 
   useEffect(() => {
     fetchPosts();
@@ -132,23 +111,25 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     const urls: string[] = [];
     
     for (const item of selectedFiles) {
-      const fileExt = item.file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('media')
-        .upload(fileName, item.file);
+      try {
+        const formData = new FormData();
+        formData.append('file', item.file);
+        formData.append('userId', userId || 'anonymous');
 
-      if (error) {
-        console.error("Upload error:", error);
-        continue;
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+        
+        const data = await response.json();
+        if (data.publicUrl) {
+          urls.push(data.publicUrl);
+        }
+      } catch (err) {
+        console.error("Upload error via API:", err);
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-      
-      urls.push(publicUrl);
     }
     
     setUploadProgress(null);
@@ -162,25 +143,26 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     try {
       const mediaUrls = await uploadMedia();
       
-      const insertData: any = { 
+      const body = { 
         group_id: groupId, 
         user_id: userId, 
         content: newPost.trim(),
-        media_urls: mediaUrls
+        media_urls: mediaUrls,
+        reply_to_id: replyingTo ? replyingTo.id : undefined
       };
-      
-      if (replyingTo) insertData.reply_to_id = replyingTo.id;
 
-      const { data: postData } = await supabase.from('posts').insert(insertData).select().maybeSingle();
+      const postData = await fetchAPI('/api/posts', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+
       if (postData) {
-        await supabase.from('history').insert({ user_id: userId, action_type: 'post_created', action_id: postData.id, metadata: { group_id: groupId } });
-        socket.emit('new_post', groupId);
         setNewPost('');
         setReplyingTo(null);
         setSelectedFiles([]);
       }
     } catch (err) { 
-      console.error("Failed to send post:", err); 
+      console.error("Failed to send post via API:", err); 
     } finally { 
       setLoading(false); 
     }
@@ -189,15 +171,20 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   async function handleToggleReaction(postId: string, emoji: string) {
     if (!userId) return;
     setActiveReactionPicker(null);
-    const { data: existing } = await supabase.from('reactions').select('*').eq('post_id', postId).eq('user_id', userId).maybeSingle();
-    if (existing) {
-      if (existing.emoji === emoji) await supabase.from('reactions').delete().eq('id', existing.id);
-      else await supabase.from('reactions').update({ emoji }).eq('id', existing.id);
-    } else {
-      await supabase.from('reactions').insert({ post_id: postId, user_id: userId, emoji });
-      await supabase.from('history').insert({ user_id: userId, action_type: 'reacted_to_post', action_id: postId, metadata: { emoji } });
+    
+    try {
+      await fetchAPI('/api/reactions', {
+        method: 'POST',
+        body: JSON.stringify({
+          post_id: postId,
+          user_id: userId,
+          emoji,
+          group_id: groupId
+        })
+      });
+    } catch (err) {
+      console.error("Failed to toggle reaction via API:", err);
     }
-    socket.emit('new_reaction', groupId);
   }
 
   const formatDateLabel = (dateStr: string) => {
