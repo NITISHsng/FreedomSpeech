@@ -5,7 +5,6 @@ import { Sidebar } from '@/components/Sidebar';
 import { ChatRoom } from '@/components/ChatRoom';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 import { supabase } from '@/lib/supabase';
-import { fetchAPI } from '@/lib/api';
 import { Plus, Database, AlertCircle } from 'lucide-react';
 
 export default function Dashboard() {
@@ -61,11 +60,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchInitialGroup();
-    
-    // Verify our new Express API backend is reachable!
-    fetchAPI('/api/health')
-      .then(res => console.log('✅ Express Backend Connection:', res))
-      .catch(err => console.error('❌ Express Backend Connection Failed:', err));
   }, [fetchInitialGroup]);
 
   const handleCreateFirst = async () => {

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { socket } from '@/lib/api';
 import { 
   Zap, Hash, Plus, Loader2, X, ArrowRight, Settings, 
   Search, History, Globe, LogOut 
@@ -60,14 +59,28 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
   useEffect(() => {
     fetchGroups();
 
-    const handleGroupsChanged = () => {
-      fetchGroups();
-    };
-
-    socket.on('groups_changed', handleGroupsChanged);
+    const groupsChannel = supabase
+      .channel('groups-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'groups' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setGroups((prev) => {
+              if (prev.find(g => g.id === payload.new.id)) return prev;
+              return [...prev, payload.new as Group];
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setGroups((prev) => prev.filter(g => g.id !== payload.old.id));
+          } else {
+            fetchGroups(); 
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      socket.off('groups_changed', handleGroupsChanged);
+      supabase.removeChannel(groupsChannel);
     };
   }, [fetchGroups]);
 
@@ -86,14 +99,19 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
 
     fetchHistory();
 
-    const handleHistoryRefresh = () => {
-      fetchHistory();
-    };
-
-    socket.on('refresh_posts', handleHistoryRefresh);
+    const historyChannel = supabase
+      .channel('user-history')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'history', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          setHistory((prev) => [payload.new, ...prev].slice(0, 10));
+        }
+      )
+      .subscribe();
 
     return () => {
-      socket.off('refresh_posts', handleHistoryRefresh);
+      supabase.removeChannel(historyChannel);
     };
   }, [userId]);
 
@@ -154,7 +172,6 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
       setIsInputVisible(false);
       setGroups(prev => [...prev, data as Group]);
       handleGroupClick(data.id);
-      socket.emit('group_update');
     }
     
     setIsCreating(false);
