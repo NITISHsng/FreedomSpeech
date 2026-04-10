@@ -11,8 +11,15 @@ const http = require('http');
 const { Server } = require('socket.io');
 const multer = require('multer');
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('❌ CRITICAL ERROR: Supabase environment variables are missing in backend/.env');
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+console.log('--- Backend Initialization ---');
+console.log('SUPABASE_URL:', SUPABASE_URL ? '✅ Defined' : '❌ UNDEFINED');
+console.log('SUPABASE_KEY:', SUPABASE_KEY ? '✅ Defined' : '❌ UNDEFINED');
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ CRITICAL ERROR: Supabase environment variables are missing (SUPABASE_URL or SUPABASE_KEY)');
   process.exit(1);
 }
 
@@ -21,10 +28,7 @@ const PORT = process.env.PORT || 5000;
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Initialize Supabase Client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Set up server for Socket.io
 const server = http.createServer(app);
