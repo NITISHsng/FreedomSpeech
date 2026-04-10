@@ -1,16 +1,26 @@
 require('dotenv').config();
+
+console.log('--- Backend Initialization ---');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Defined' : '❌ UNDEFINED');
+console.log('SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Defined' : '❌ UNDEFINED');
+
+const { createClient } = require('@supabase/supabase-js');
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-const { createClient } = require('@supabase/supabase-js');
 const multer = require('multer');
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('❌ CRITICAL ERROR: Supabase environment variables are missing in backend/.env');
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Initialize Supabase Client (Service Role for backend operations)
+// Initialize Supabase Client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
