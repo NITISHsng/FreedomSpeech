@@ -203,9 +203,9 @@ app.post('/api/posts', async (req, res) => {
 // Update a post
 app.patch('/api/posts/:id', async (req, res) => {
   const { id } = req.params;
-  const { content } = req.body;
+  const { content, is_deleted } = req.body;
 
-  console.log(`📝 Attempting to update post ${id} with content: ${content?.substring(0, 20)}...`);
+  console.log(`📝 Attempting to update post ${id} (is_deleted: ${is_deleted})...`);
 
   try {
     const { data: post, error: fetchError } = await supabase
@@ -224,9 +224,18 @@ app.patch('/api/posts/:id', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
+    const updatePayload = {};
+    if (content !== undefined) {
+      updatePayload.content = content;
+      updatePayload.is_edited = true;
+    }
+    if (is_deleted !== undefined) {
+      updatePayload.is_deleted = is_deleted;
+    }
+
     const { data, error } = await supabase
       .from('posts')
-      .update({ content, is_edited: true })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .maybeSingle();

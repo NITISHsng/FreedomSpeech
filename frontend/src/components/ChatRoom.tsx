@@ -45,6 +45,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [replyingTo, setReplyingTo] = useState<Post | null>(null);
   const [commentingTo, setCommentingTo] = useState<Post | null>(null);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const [groupName, setGroupName] = useState('Global');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -315,6 +316,28 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     }
   }
 
+  async function handleDelete(postId: string) {
+    setPostToDelete(postId);
+  }
+
+  async function confirmDelete() {
+    if (!userId || loading || !postToDelete) return;
+    
+    setLoading(true);
+    try {
+      await fetchAPI(`/api/posts/${postToDelete}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_deleted: true })
+      });
+      fetchPosts();
+      setPostToDelete(null);
+    } catch (err) {
+      console.error("Failed to delete post via API:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleToggleReaction(postId: string, emoji: string) {
     if (!userId) return;
     setActiveReactionPicker(null);
@@ -430,9 +453,11 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
               )}
               
               {isDeleted ? (
-                <div className="flex items-center gap-2 py-1 opacity-60 italic select-none">
-                  <Trash2 size={12} className="shrink-0" />
-                  <span className="text-[11px] leading-tight flex-1">Message was deleted by {post.profiles?.username || 'User'}</span>
+                <div className="flex items-center gap-3 py-1.5 opacity-40 italic select-none">
+                  <Trash2 size={14} className="shrink-0 text-slate-400" />
+                  <span className="text-[11px] font-medium leading-tight text-slate-300 tracking-tight">
+                    Message was deleted by {post.profiles?.username || 'Ghost'}
+                  </span>
                 </div>
               ) : (
                 <>
@@ -500,6 +525,14 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                           <Pencil size={10} /> Edit
                         </button>
                       )}
+                      {post.user_id === userId && (
+                        <button 
+                          onClick={() => handleDelete(post.id)} 
+                          className="p-1 px-1.5 rounded hover:bg-destructive/10 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+                        >
+                          <Trash2 size={10} /> Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>
@@ -560,6 +593,51 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
               initial={{ scale: 0.9 }} animate={{ scale: 1 }}
               src={lightboxImage} className="max-w-full max-h-full rounded-2xl shadow-2xl" 
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {postToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-card border border-border w-full max-w-sm rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-destructive/20">
+                <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 0.3 }} className="h-full bg-destructive" />
+              </div>
+              
+              <div className="flex flex-col items-center text-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-2">
+                  <Trash2 size={32} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black uppercase tracking-tighter">Delete Message?</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">This will mark your ghost thought as deleted forever. Other ghosts will see the deletion placeholder.</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 w-full mt-4">
+                  <button 
+                    onClick={() => setPostToDelete(null)}
+                    className="p-3 rounded-2xl bg-secondary text-secondary-foreground font-bold text-xs uppercase tracking-widest hover:bg-secondary/80 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={confirmDelete}
+                    disabled={loading}
+                    className="p-3 rounded-2xl bg-destructive text-white font-bold text-xs uppercase tracking-widest hover:bg-destructive/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-destructive/20"
+                  >
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
