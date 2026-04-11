@@ -19,15 +19,34 @@ export default function Dashboard() {
     setError(null);
 
     try {
+      const recencyStr = localStorage.getItem('freedom_recency');
+      let recencyMap: Record<string, number> = {};
+      if (recencyStr) {
+        try { recencyMap = JSON.parse(recencyStr); } catch(e) {}
+      }
+
       const groups = await fetchAPI('/api/groups');
-      const globalGroup = groups?.find((g: any) => g.slug === 'global');
       
-      if (globalGroup) {
-        setActiveGroupId(globalGroup.id);
-      } else if (groups && groups.length > 0) {
-        setActiveGroupId(groups[0].id);
-      } else {
+      if (!groups || groups.length === 0) {
         setError('No communities found. Please create your first community below.');
+        setIsInitializing(false);
+        return;
+      }
+
+      let lastVisitedId: string | null = null;
+      let maxTime = 0;
+      
+      Object.entries(recencyMap).forEach(([id, time]) => {
+        if (time > maxTime) {
+          maxTime = time;
+          lastVisitedId = id;
+        }
+      });
+
+      if (lastVisitedId && groups.some((g: any) => g.id === lastVisitedId)) {
+        setActiveGroupId(lastVisitedId);
+      } else {
+        setActiveGroupId(null);
       }
     } catch (err: any) {
       console.error('Initial fetch error:', err);
@@ -48,8 +67,8 @@ export default function Dashboard() {
       const newGroup = await fetchAPI('/api/groups', {
         method: 'POST',
         body: JSON.stringify({
-          name: 'Global Square',
-          slug: 'global',
+          name: 'General',
+          slug: 'general',
           description: 'The main community for everyone to speak freely.'
         })
       });
@@ -98,7 +117,7 @@ export default function Dashboard() {
                   className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-primary/90 transition-all shadow-xl shadow-primary/20"
                 >
                   <Plus size={18} />
-                  Create Global Community
+                  Create General Community
                 </button>
                 <div className="p-4 bg-secondary/50 rounded-xl border border-border text-[10px] text-left font-mono truncate">
                   Error Detail: {error}
@@ -120,8 +139,36 @@ export default function Dashboard() {
             onMenuClick={() => setIsSidebarOpen(true)}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground italic text-sm p-8 text-center">
-            Select a community in the sidebar menu to join the conversation
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
+            <div className="max-w-md w-full space-y-8 glass-card p-10 rounded-3xl shadow-2xl border border-white/5 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              
+              <div className="relative z-10 space-y-6">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary to-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-primary/20 rotate-3 transition-transform duration-500 group-hover:rotate-6">
+                  <div className="text-3xl font-black text-white italic">FS</div>
+                </div>
+                
+                <div className="space-y-4">
+                  <h2 className="text-3xl font-black tracking-tight text-foreground">Welcome to <span className="text-primary pr-1">Freedom</span>Speech</h2>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    A completely decentralized, secure, and anonymous communication node. Your unique ghost identity is ready.
+                  </p>
+                </div>
+
+                <div className="pt-4 flex justify-center">
+                  <button 
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="md:hidden px-8 py-3.5 bg-white text-black font-bold uppercase tracking-widest text-[11px] rounded-full shadow-xl hover:scale-105 transition-transform"
+                  >
+                    Open Menu
+                  </button>
+                  <div className="hidden md:flex items-center gap-3 bg-secondary/50 rounded-full px-6 py-3 border border-border">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">&larr; Select a community</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

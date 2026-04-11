@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { socket, fetchAPI } from '@/lib/api';
-import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2 } from 'lucide-react';
+import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
@@ -48,6 +48,14 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; preview: string }[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  
+  // Advanced Scroll & Unread State
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [unreadCountInSession, setUnreadCountInSession] = useState(0);
+  const initialLastSeen = useRef<number>(0);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const isInitialLoad = useRef(true);
+  const lastPostCount = useRef(0);
 
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => setHasMounted(true), []);
@@ -66,6 +74,81 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       console.error("Failed to fetch data via API:", err);
     }
   }, [groupId, userId]);
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  }, []);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setIsAtBottom(atBottom);
+    if (atBottom) {
+      setUnreadCountInSession(0);
+    }
+  };
+
+  useEffect(() => {
+    if (!groupId) return;
+    
+    // Capture previous visit timestamp
+    const recencyStr = localStorage.getItem('freedom_recency');
+    if (recencyStr) {
+      try {
+        const recencyMap = JSON.parse(recencyStr);
+        initialLastSeen.current = recencyMap[groupId] || 0;
+      } catch (e) {
+        initialLastSeen.current = 0;
+      }
+    }
+    
+    isInitialLoad.current = true;
+    setUnreadCountInSession(0);
+  }, [groupId]);
+
+  useEffect(() => {
+    if (posts.length === 0) return;
+
+    // Initial Load Logic
+    if (isInitialLoad.current) {
+      const hasUnread = posts.some(p => p.user_id !== userId && new Date(p.created_at).getTime() > initialLastSeen.current);
+      if (hasUnread) {
+        // Direct jump to first unread message without animation
+        setTimeout(() => {
+          if (firstUnreadRef.current) {
+            firstUnreadRef.current.scrollIntoView({ behavior: 'auto', block: 'start' });
+          } else {
+            scrollToBottom(false);
+          }
+        }, 50);
+      } else {
+        scrollToBottom(false);
+      }
+      isInitialLoad.current = false;
+      lastPostCount.current = posts.length;
+      return;
+    }
+
+    // New Message Logic
+    if (posts.length > lastPostCount.current) {
+      const lastPost = posts[posts.length - 1];
+      const isMyMessage = lastPost.user_id === userId;
+
+      if (isMyMessage || isAtBottom) {
+        scrollToBottom(true);
+      } else {
+        setUnreadCountInSession(prev => prev + (posts.length - lastPostCount.current));
+      }
+    }
+
+    lastPostCount.current = posts.length;
+  }, [posts, userId, isAtBottom, scrollToBottom]);
 
   useEffect(() => {
     fetchPosts();
@@ -91,11 +174,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       socket.off('refresh_posts', handleRefresh);
       socket.off('user_typing', handleUserTyping);
     };
-  }, [groupId, userId]);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [posts]);
+  }, [groupId, userId, fetchPosts]);
 
   // Image Handling
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,16 +327,27 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary blur-[120px] rounded-full" />
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 custom-scrollbar">
         <AnimatePresence initial={false}>
           {posts.map((post, index) => {
             const currentDate = new Date(post.created_at).toDateString();
             const prevDate = index > 0 ? new Date(posts[index - 1].created_at).toDateString() : null;
             const showDateHeader = currentDate !== prevDate;
             const isSameUserAsPrev = index > 0 && posts[index - 1].user_id === post.user_id && !showDateHeader;
+            
+            const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
+            const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1].created_at).getTime() <= initialLastSeen.current);
 
             return (
               <div key={`post-container-${post.id}`} className={cn("flex flex-col", index > 0 ? (isSameUserAsPrev ? "mt-1.5" : "mt-6") : "")}>
+                {isFirstNew && (
+                  <div ref={firstUnreadRef} className="flex justify-center my-8 relative">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-primary/30"></div></div>
+                    <span className="relative px-4 py-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 shadow-sm">
+                      Unread Messages
+                    </span>
+                  </div>
+                )}
                 {showDateHeader && (
                   <div className="flex justify-center mb-6 mt-2">
                     <span className="px-4 py-1.5 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
@@ -296,7 +386,8 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                       )}
 
                       <p className="leading-relaxed whitespace-pre-wrap pr-10">{post.content}</p>
-                      <div className="absolute bottom-1.5 right-2 flex items-center gap-1 opacity-60">
+                      <div className="absolute bottom-1.5 right-2 flex items-center gap-1.5 opacity-60">
+                        {isNew && <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />}
                         <span className="text-[10px] font-medium leading-none">{new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                       </div>
                     </div>
@@ -329,6 +420,26 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           })}
         </AnimatePresence>
       </div>
+
+      {/* Scroll to Bottom Button */}
+      <AnimatePresence>
+        {!isAtBottom && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-28 right-6 z-40 p-3 bg-primary text-white rounded-full shadow-2xl hover:bg-primary/90 transition-all group flex items-center gap-2"
+          >
+            {unreadCountInSession > 0 && (
+              <span className="bg-white text-primary text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] shadow-sm">
+                {unreadCountInSession}
+              </span>
+            )}
+            <ArrowDown size={20} className="group-hover:translate-y-0.5 transition-transform" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <div className="p-4 md:p-6 border-t border-border bg-card/50 backdrop-blur-xl relative z-20 flex flex-col gap-3">
         {/* Attachment Previews */}
