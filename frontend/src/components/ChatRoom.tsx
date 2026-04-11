@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { socket, fetchAPI } from '@/lib/api';
-import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown } from 'lucide-react';
+import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, AtSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
+import { CommentThread } from './chat/CommentThread';
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
@@ -30,6 +31,110 @@ interface ChatRoomProps {
   userId: string | null;
   onMenuClick?: () => void;
 }
+
+// Recursive Comment Component
+const CommentNode = ({ 
+  comment, 
+  posts, 
+  userId, 
+  depth = 0,
+  highlightedPost,
+  activeReactionPicker,
+  setActiveReactionPicker,
+  setReplyingTo,
+  handleToggleReaction
+}: { 
+  comment: Post; 
+  posts: Post[]; 
+  userId: string | null;
+  depth?: number;
+  highlightedPost: string | null;
+  activeReactionPicker: string | null;
+  setActiveReactionPicker: (id: string | null) => void;
+  setReplyingTo: (post: Post | null) => void;
+  handleToggleReaction: (id: string, emoji: string) => void;
+}) => {
+  const replies = posts.filter(r => r.reply_to_id === comment.id);
+  const maxDepth = 4; // Visual limit for indentation
+
+  const lineColors = [
+    "border-primary/30",         // Level 1
+    "border-emerald-500/30",     // Level 2
+    "border-amber-500/30",       // Level 3
+    "border-rose-500/30",        // Level 4
+    "border-indigo-500/30"       // Level 5+
+  ];
+
+  return (
+    <div className={cn(
+      "relative mt-1 group/comment",
+      depth > 0 && `ml-3 md:ml-6 border-l-2 ${lineColors[(depth - 1) % lineColors.length]} pl-3`
+    )}>
+      <motion.div 
+        id={`post-${comment.id}`}
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        className={cn(
+          "relative py-0.5 px-2.5 rounded-xl bg-secondary/10 text-xs shadow-sm transition-all duration-300",
+          highlightedPost === comment.id && "ring-4 ring-primary ring-offset-4 ring-offset-background bg-primary/5 scale-[1.02] z-10 shadow-lg shadow-primary/20"
+        )}
+      >
+        <div className="flex items-center justify-between mb-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{comment.profiles?.username}</span>
+            <span className="text-[8px] text-muted-foreground/50">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <div className="flex items-center gap-1.5 opacity-0 group-hover/comment:opacity-100 transition-opacity">
+            <button onClick={() => setReplyingTo(comment)} className="p-1 hover:bg-primary/20 rounded text-[8px] font-black uppercase text-primary transition-colors">
+              Reply
+            </button>
+            <button onClick={() => setActiveReactionPicker(activeReactionPicker === comment.id ? null : comment.id)} className="p-1 hover:bg-secondary rounded transition-colors"><Smile size={10} /></button>
+          </div>
+        </div>
+        
+        <p className="text-slate-400 leading-tight pr-6">{comment.content}</p>
+
+        {/* Reaction Picker for Comment */}
+        <AnimatePresence>
+          {activeReactionPicker === comment.id && (
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 5 }} className="absolute bottom-full mb-1 z-50 flex gap-0.5 p-0.5 bg-card border border-border rounded-lg shadow-xl scale-75 origin-bottom">
+              {EMOJI_OPTIONS.map(emoji => <button key={emoji} onClick={() => handleToggleReaction(comment.id, emoji)} className="w-6 h-6 flex items-center justify-center rounded text-base hover:bg-primary/10">{emoji}</button>)}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Comment Reactions */}
+        {comment.reactions && Object.keys(comment.reactions).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {Object.entries(comment.reactions).map(([emoji, count]) => (
+              <button key={emoji} onClick={() => handleToggleReaction(comment.id, emoji)} className={cn("px-1 py-0 rounded-full border text-[8px] font-bold", comment.user_reaction === emoji ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary/50 border-border")}>{emoji} {count}</button>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Recursive Replies */}
+      {replies.length > 0 && (
+        <div className="mt-0.5">
+          {replies.map(reply => (
+            <CommentNode 
+              key={reply.id} 
+              comment={reply} 
+              posts={posts} 
+              userId={userId} 
+              depth={depth + 1}
+              highlightedPost={highlightedPost}
+              activeReactionPicker={activeReactionPicker}
+              setActiveReactionPicker={setActiveReactionPicker}
+              setReplyingTo={setReplyingTo}
+              handleToggleReaction={handleToggleReaction}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -57,8 +162,24 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const isInitialLoad = useRef(true);
   const lastPostCount = useRef(0);
 
+  const [highlightedPost, setHighlightedPost] = useState<string | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => setHasMounted(true), []);
+
+  const jumpToMessage = useCallback((messageId: string) => {
+    const element = document.getElementById(`post-${messageId}`);
+    if (element) {
+      // Small delay to ensure any layout changes are settled
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      setHighlightedPost(messageId);
+      // Clear highlight after animation
+      setTimeout(() => setHighlightedPost(null), 2500);
+    } else {
+      console.warn(`Message with ID ${messageId} not found in the current view.`);
+    }
+  }, []);
 
   const fetchPosts = useCallback(async () => {
     if (!groupId) return;
@@ -330,11 +451,16 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 custom-scrollbar">
         <AnimatePresence initial={false}>
-          {posts.map((post, index) => {
-            const currentDate = new Date(post.created_at).toDateString();
-            const prevDate = index > 0 ? new Date(posts[index - 1].created_at).toDateString() : null;
-            const showDateHeader = currentDate !== prevDate;
-            const isSameUserAsPrev = index > 0 && posts[index - 1].user_id === post.user_id && !showDateHeader;
+          {(() => {
+            const parentPosts = posts.filter(p => !p.reply_to_id);
+            return parentPosts.map((post, index) => {
+              const comments = posts.filter(c => c.reply_to_id === post.id);
+              const isExpanded = expandedThreads.has(post.id);
+              
+              const currentDate = new Date(post.created_at).toDateString();
+              const prevDate = index > 0 ? new Date(parentPosts[index - 1].created_at).toDateString() : null;
+              const showDateHeader = currentDate !== prevDate;
+              const isSameUserAsPrev = index > 0 && parentPosts[index - 1].user_id === post.user_id && !showDateHeader;
             
             const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
             const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1].created_at).getTime() <= initialLastSeen.current);
@@ -355,7 +481,17 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                   </div>
                 )}
                 
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("max-w-[85%] md:max-w-xl group flex flex-col relative", post.user_id === userId ? "ml-auto items-end" : "mr-auto items-start")}>
+                <motion.div 
+                  id={`post-${post.id}`}
+                  initial={{ opacity: 0, y: 10 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  whileHover={{ scale: 1.01 }}
+                  className={cn(
+                    "max-w-[85%] md:max-w-xl group flex flex-col relative transition-all duration-700", 
+                    post.user_id === userId ? "ml-auto items-end" : "mr-auto items-start",
+                    highlightedPost === post.id && "ring-4 ring-primary ring-offset-4 ring-offset-background rounded-2xl scale-[1.05] z-50 shadow-[0_0_50px_rgba(59,130,246,0.5)] bg-primary/10"
+                  )}
+                >
                   {post.user_id !== userId && !isSameUserAsPrev && <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1.5 px-2 drop-shadow-sm">{post.profiles?.username}</span>}
 
                   <div className="relative group/bubble max-w-full">
@@ -363,7 +499,13 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                       
                       {/* Quoted Content */}
                       {post.reply_to && (
-                        <div className={cn("mb-3 p-2 rounded-lg border-l-2 text-[11px] bg-black/10 flex flex-col gap-1", post.user_id === userId ? "border-white/30" : "border-primary/50")}>
+                        <div 
+                          onClick={() => post.reply_to_id && jumpToMessage(post.reply_to_id)}
+                          className={cn(
+                            "mb-3 p-2 rounded-lg border-l-2 text-[11px] bg-black/10 flex flex-col gap-1 cursor-pointer hover:bg-black/20 transition-all text-left", 
+                            post.user_id === userId ? "border-white/30" : "border-primary/50"
+                          )}
+                        >
                           <span className="font-bold opacity-80 uppercase text-[9px]">{post.reply_to.profiles?.username}</span>
                           <p className="line-clamp-2 italic opacity-70">{post.reply_to.content}</p>
                         </div>
@@ -394,9 +536,10 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                     </div>
 
                     {/* Actions */}
-                    <div className={cn("absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all z-20", post.user_id === userId ? "-left-20 flex-row-reverse" : "-right-20")}>
-                      <button onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary"><Smile size={14} /></button>
-                      <button onClick={() => setReplyingTo(post)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary"><Reply size={14} /></button>
+                    <div className={cn("absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all z-20", post.user_id === userId ? "-left-28 flex-row-reverse" : "-right-28")}>
+                      <button onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary transition-all active:scale-90" title="React"><Smile size={14} /></button>
+                      <button onClick={() => setReplyingTo(post)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary transition-all active:scale-90" title="Comment"><MessageSquare size={14} /></button>
+                      <button onClick={() => setReplyingTo(post)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary transition-all active:scale-90" title="Quote Reply"><Reply size={14} /></button>
                     </div>
 
                     <AnimatePresence>
@@ -414,11 +557,38 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                         ))}
                       </div>
                     )}
+
+                    {comments.length > 0 && (
+                      <div className={cn("flex items-center gap-1.5 mt-2 px-2", post.user_id === userId ? "justify-end mr-10" : "justify-start")}>
+                        <MessageSquare size={10} className="text-primary/60" />
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}</span>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Comment Section Inline (Recursive) */}
+                  {(comments.length > 0 || replyingTo?.id === post.id) && (
+                    <div className="w-full mt-4">
+                       {comments.map((comment) => (
+                          <CommentNode 
+                            key={comment.id}
+                            comment={comment}
+                            posts={posts}
+                            userId={userId}
+                            depth={1}
+                            highlightedPost={highlightedPost}
+                            activeReactionPicker={activeReactionPicker}
+                            setActiveReactionPicker={setActiveReactionPicker}
+                            setReplyingTo={setReplyingTo}
+                            handleToggleReaction={handleToggleReaction}
+                          />
+                       ))}
+                    </div>
+                  )}
                 </motion.div>
               </div>
             );
-          })}
+          })})()}
         </AnimatePresence>
       </div>
 
@@ -466,11 +636,16 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           )}
         </AnimatePresence>
 
-        {/* Reply Preview */}
+        {/* Comment/Reply Preview */}
         <AnimatePresence>
           {replyingTo && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center">
-              <div className="flex flex-col gap-0.5"><span className="text-[10px] font-bold uppercase text-primary">Replying to {replyingTo.profiles?.username}</span><p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p></div>
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center bg-card">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-black uppercase text-primary flex items-center gap-1">
+                  <AtSign size={10} /> {replyingTo.reply_to_id ? "Replying to comment by" : "Commenting on message by"} {replyingTo.profiles?.username}
+                </span>
+                <p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p>
+              </div>
               <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"><X size={14} /></button>
             </motion.div>
           )}
@@ -526,6 +701,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           </button>
         </div>
       </div>
+
     </div>
   );
 }
