@@ -443,7 +443,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
           <div className={cn("relative group/bubble", depth > 0 ? "w-full" : "max-w-full")}>
             <div className={cn("px-2 py-1.5 rounded-xl shadow-md text-[13px] transition-all min-w-[60px] overflow-hidden relative", post.user_id === userId ? "bg-primary text-white shadow-primary/20 rounded-tr-none border border-white/10" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40")}>
-              {post.is_edited && (
+              {post.is_edited && !isDeleted && (
                 <span className={cn(
                   "absolute top-1 right-1.5 text-[7px] font-black uppercase tracking-tighter",
                   post.user_id === userId ? "text-white/40" : "text-slate-500/60"
@@ -500,37 +500,53 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                       ? "max-h-12 opacity-100 mt-1.5" 
                       : "max-h-0 opacity-0 group-hover/bubble:max-h-12 group-hover/bubble:opacity-100 group-hover/bubble:mt-1.5"
                   )}>
-                    <div className="pt-1 border-t border-white/5 flex items-center gap-1">
-                      <button onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} className="p-1 px-1.5 rounded hover:bg-white/5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-                        <Smile size={10} /> {post.user_reaction ? 'Reacted' : 'React'}
+                    <div className="pt-1.5 border-t border-white/5 flex items-center gap-0.5">
+                      <button 
+                        title="React"
+                        onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} 
+                        className={cn(
+                          "p-1.5 rounded-lg transition-all",
+                          post.user_reaction ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-white/5 hover:text-primary"
+                        )}
+                      >
+                        <Smile size={12} />
                       </button>
-                      <button onClick={() => { setCommentingTo(null); setReplyingTo(post); scrollToBottom(true); }} className="p-1 px-1.5 rounded hover:bg-white/5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-                        <Reply size={10} /> Reply
+                      <button 
+                        title="Reply"
+                        onClick={() => { setCommentingTo(null); setReplyingTo(post); scrollToBottom(true); }} 
+                        className="p-1.5 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-primary transition-all"
+                      >
+                        <Reply size={12} />
                       </button>
-                      <button onClick={() => { setReplyingTo(null); setCommentingTo(post); }} className="p-1 px-1.5 rounded hover:bg-white/5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-                        <MessageSquare size={10} /> Comment
+                      <button 
+                        title="Comment"
+                        onClick={() => { setReplyingTo(null); setCommentingTo(post); }} 
+                        className="p-1.5 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-primary transition-all"
+                      >
+                        <MessageSquare size={12} />
                       </button>
                       {post.user_id === userId && (
                         <button 
+                          title="Edit"
                           onClick={() => { 
                             setReplyingTo(null); 
                             setCommentingTo(null); 
                             setEditingPost(post); 
                             setNewPost(content);
-                            // Visual feedback: scroll to input
                             document.querySelector('textarea')?.focus();
                           }} 
-                          className="p-1 px-1.5 rounded hover:bg-white/10 text-[9px] font-bold uppercase tracking-wider text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+                          className="p-1.5 rounded-lg text-amber-500/80 hover:bg-amber-500/10 hover:text-amber-400 transition-all"
                         >
-                          <Pencil size={10} /> Edit
+                          <Pencil size={12} />
                         </button>
                       )}
                       {post.user_id === userId && (
                         <button 
+                          title="Delete"
                           onClick={() => handleDelete(post.id)} 
-                          className="p-1 px-1.5 rounded hover:bg-destructive/10 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+                          className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
                         >
-                          <Trash2 size={10} /> Delete
+                          <Trash2 size={12} />
                         </button>
                       )}
                     </div>

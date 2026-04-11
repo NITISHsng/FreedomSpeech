@@ -64,18 +64,36 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <Link
-              href="/login"
-              className="px-10 py-5 bg-primary text-white rounded-2xl font-bold flex flex-col items-center gap-1 hover:bg-primary/90 transition-all shadow-2xl shadow-primary/20 group text-lg"
+            <motion.div
+              animate={{ 
+                scale: [1, 1.02, 1],
+                boxShadow: [
+                  "0 0 0px var(--primary)",
+                  "0 0 20px var(--primary)",
+                  "0 0 0px var(--primary)"
+                ]
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="rounded-2xl"
             >
-              <div className="flex items-center gap-2">
-                Start Speaking{" "}
-                <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-              </div>
-              <span className="text-xs opacity-80 font-medium">
-                কথা বলা শুরু করুন
-              </span>
-            </Link>
+              <Link
+                href="/login"
+                className="px-10 py-5 bg-primary text-white rounded-2xl font-bold flex flex-col items-center gap-1 hover:bg-primary/90 transition-all shadow-2xl shadow-primary/40 group text-lg relative overflow-hidden"
+              >
+                <div className="flex items-center gap-2 relative z-10">
+                  Start Speaking{" "}
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                </div>
+                <span className="text-xs opacity-80 font-medium relative z-10">
+                  কথা বলা শুরু করুন
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
+              </Link>
+            </motion.div>
             <Link
               href="#features"
               className="px-10 py-5 bg-secondary/50 backdrop-blur-md rounded-2xl font-bold hover:bg-secondary transition-all text-lg flex flex-col items-center gap-1"

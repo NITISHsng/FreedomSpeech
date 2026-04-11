@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatRoom } from '@/components/ChatRoom';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
@@ -8,11 +9,19 @@ import { Plus, AlertCircle } from 'lucide-react';
 import { fetchAPI } from '@/lib/api';
 
 export default function Dashboard() {
-  const { userId } = useAnonymousUser();
+  const router = useRouter();
+  const { userId, isLoaded } = useAnonymousUser({ autoRegister: false });
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Auth Protection - Redirect if no identity found after loading
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push('/login');
+    }
+  }, [isLoaded, userId, router]);
 
   const fetchInitialGroup = useCallback(async () => {
     setIsInitializing(true);
@@ -148,7 +157,7 @@ export default function Dashboard() {
                   <img 
                     src="/logo.webp" 
                     alt="FreedomSpeech Logo" 
-                    className="w-14 h-14 object-contain"
+                    className="w-24 h-24 scale-350 object-contain"
                   />
                 </div>
                 

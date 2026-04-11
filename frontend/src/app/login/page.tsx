@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ghost, ArrowRight, Zap, Loader2, AlertCircle, Key, UserPlus } from 'lucide-react';
+import { Ghost, ArrowRight, Zap, Loader2, AlertCircle, Key, UserPlus, ChevronLeft } from 'lucide-react';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
@@ -59,6 +59,17 @@ export default function LoginPage() {
       {/* Background Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/10 blur-[120px] rounded-full pointer-events-none" />
+
+      {/* Back to Home Button */}
+      <motion.button
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        onClick={() => router.push('/')}
+        className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-secondary/30 backdrop-blur-xl border border-border/50 rounded-full text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all z-50 group"
+      >
+        <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+        <span>Back to Home</span>
+      </motion.button>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
