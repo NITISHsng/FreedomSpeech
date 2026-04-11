@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { userId, registerGhost, reclaimGhost, getTimestampedId } = useAnonymousUser();
+  const { userId, registerGhost, reclaimGhost, getTimestampedId } = useAnonymousUser({ autoRegister: false });
   const [activeTab, setActiveTab] = useState<'new' | 'reclaim'>('new');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

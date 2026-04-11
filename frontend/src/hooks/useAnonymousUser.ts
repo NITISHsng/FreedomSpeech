@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchAPI } from '@/lib/api';
 
-export function useAnonymousUser() {
+export function useAnonymousUser(options: { autoRegister?: boolean } = { autoRegister: true }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<{ username: string; password_set: boolean } | null>(null);
@@ -125,8 +125,10 @@ export function useAnonymousUser() {
         setUserId(storedId);
         await fetchProfile(storedId);
         setIsLoaded(true);
-      } else {
+      } else if (options.autoRegister !== false) {
         await registerGhost();
+      } else {
+        setIsLoaded(true);
       }
     };
 

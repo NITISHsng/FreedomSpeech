@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { socket, fetchAPI } from '@/lib/api';
 import { 
-  Zap, Hash, Plus, Loader2, X, ArrowRight, Settings, 
+  Zap, Plus, Loader2, X, ArrowRight, Settings, 
   Search, History, Globe, LogOut 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,8 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
   
   const [searchTerm, setSearchTerm] = useState('');
   const [recencyMap, setRecencyMap] = useState<Record<string, number>>({});
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [globalTyping, setGlobalTyping] = useState<Record<string, string[]>>({});
   
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
@@ -73,6 +75,56 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
       socket.off('groups_changed', handleGroupsChanged);
     };
   }, [fetchGroups]);
+
+  const fetchUnreadCounts = useCallback(async () => {
+    if (Object.keys(recencyMap).length === 0) return;
+    try {
+      const counts = await fetchAPI('/api/groups/unread', {
+        method: 'POST',
+        body: JSON.stringify({ recencyMap })
+      });
+      if (counts) setUnreadCounts(counts);
+    } catch(err) {
+      console.error(err);
+    }
+  }, [recencyMap]);
+
+  useEffect(() => {
+    if (Object.keys(recencyMap).length > 0) {
+      Object.keys(recencyMap).forEach(groupId => {
+        socket.emit('join_room', groupId);
+      });
+    }
+  }, [recencyMap]);
+
+  useEffect(() => {
+    const handleGlobalTyping = ({ groupId, username, isTyping }: { groupId: string, username: string, isTyping: boolean }) => {
+      setGlobalTyping(prev => {
+        const groupTypers = prev[groupId] || [];
+        if (isTyping && !groupTypers.includes(username)) {
+          return { ...prev, [groupId]: [...groupTypers, username] };
+        }
+        if (!isTyping && groupTypers.includes(username)) {
+          return { ...prev, [groupId]: groupTypers.filter(u => u !== username) };
+        }
+        return prev;
+      });
+    };
+
+    socket.on('user_typing', handleGlobalTyping);
+
+    return () => {
+      socket.off('user_typing', handleGlobalTyping);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCounts();
+    socket.on('refresh_posts', fetchUnreadCounts);
+    return () => {
+      socket.off('refresh_posts', fetchUnreadCounts);
+    }
+  }, [fetchUnreadCounts]);
 
   useEffect(() => {
     if (!userId) return;
@@ -118,6 +170,7 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
     const newRecency = { ...recencyMap, [groupId]: Date.now() };
     setRecencyMap(newRecency);
     localStorage.setItem('freedom_recency', JSON.stringify(newRecency));
+    setUnreadCounts(prev => ({ ...prev, [groupId]: 0 }));
   };
 
   const handleCreateBooth = async (e: React.FormEvent) => {
@@ -253,21 +306,61 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
                 </p>
               </div>
             ) : (
-              filteredGroups.map((group) => (
-                <button
-                  key={group.id}
-                  onClick={() => handleGroupClick(group.id)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group",
-                    activeGroupId === group.id 
-                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                      : "hover:bg-secondary text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Hash className={cn("w-4 h-4", activeGroupId === group.id ? "text-white" : "text-primary")} />
-                  <span className="font-medium truncate text-sm">{group.name}</span>
-                </button>
-              ))
+              filteredGroups.map((group) => {
+                const isVisited = !!recencyMap[group.id];
+                const isActive = activeGroupId === group.id;
+                
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => handleGroupClick(group.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group border border-transparent",
+                      isActive
+                        ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-primary/20 bg-[length:200%_auto] animate-gradient" 
+                        : isVisited
+                          ? "bg-secondary/60 text-foreground hover:bg-secondary/80 hover:border-border/50"
+                          : "bg-transparent text-muted-foreground hover:bg-secondary/30 hover:text-foreground"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-transform duration-300 group-hover:scale-105 shadow-sm",
+                      isActive
+                        ? "bg-white/20 text-white shadow-inner"
+                        : isVisited
+                          ? "bg-background text-foreground border border-border/50"
+                          : "bg-primary/10 text-primary border border-primary/20"
+                    )}>
+                      {group.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex flex-col items-start overflow-hidden text-left flex-1 min-w-0">
+                      <span className={cn(
+                        "font-bold truncate text-sm w-full tracking-tight transition-colors",
+                         isActive ? "text-white" : "group-hover:text-foreground"
+                      )}>
+                        {group.name}
+                      </span>
+                      {isVisited && !isActive && (
+                        <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest mt-0.5">
+                          {globalTyping[group.id]?.length > 0 
+                            ? <span className="text-primary tracking-normal font-bold normal-case italic flex items-center gap-1">typing...</span>
+                            : "Visited"}
+                        </span>
+                      )}
+                      {isActive && globalTyping[group.id]?.length > 0 && (
+                        <span className="text-[9px] text-white/80 font-bold normal-case italic mt-0.5">
+                          typing...
+                        </span>
+                      )}
+                    </div>
+                    {unreadCounts[group.id] > 0 && !isActive && (
+                      <div className="shrink-0 bg-primary/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/30">
+                        {unreadCounts[group.id]}
+                      </div>
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

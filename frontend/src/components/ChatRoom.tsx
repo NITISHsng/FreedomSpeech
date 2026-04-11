@@ -5,6 +5,7 @@ import { socket, fetchAPI } from '@/lib/api';
 import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
@@ -33,6 +34,9 @@ interface ChatRoomProps {
 export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState('');
+  const { profile } = useAnonymousUser();
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeReactionPicker, setActiveReactionPicker] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Post | null>(null);
@@ -71,10 +75,21 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       fetchPosts();
     };
 
+    const handleUserTyping = ({ groupId: incomingGroupId, username, isTyping }: { groupId: string, username: string, isTyping: boolean }) => {
+      if (incomingGroupId !== groupId) return;
+      setTypingUsers(prev => {
+        if (isTyping && !prev.includes(username)) return [...prev, username];
+        if (!isTyping) return prev.filter(u => u !== username);
+        return prev;
+      });
+    };
+
     socket.on('refresh_posts', handleRefresh);
+    socket.on('user_typing', handleUserTyping);
 
     return () => {
       socket.off('refresh_posts', handleRefresh);
+      socket.off('user_typing', handleUserTyping);
     };
   }, [groupId, userId]);
 
@@ -233,26 +248,27 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary blur-[120px] rounded-full" />
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 relative z-10 custom-scrollbar">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10">
         <AnimatePresence initial={false}>
           {posts.map((post, index) => {
             const currentDate = new Date(post.created_at).toDateString();
             const prevDate = index > 0 ? new Date(posts[index - 1].created_at).toDateString() : null;
             const showDateHeader = currentDate !== prevDate;
+            const isSameUserAsPrev = index > 0 && posts[index - 1].user_id === post.user_id && !showDateHeader;
 
             return (
-              <div key={`post-container-${post.id}`} className="space-y-4">
+              <div key={`post-container-${post.id}`} className={cn("flex flex-col", index > 0 ? (isSameUserAsPrev ? "mt-1.5" : "mt-6") : "")}>
                 {showDateHeader && (
-                  <div className="flex justify-center my-6">
+                  <div className="flex justify-center mb-6 mt-2">
                     <span className="px-4 py-1.5 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
                   </div>
                 )}
                 
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("max-w-[85%] md:max-w-xl group flex flex-col relative", post.user_id === userId ? "ml-auto items-end" : "mr-auto items-start")}>
-                  {post.user_id !== userId && <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 px-1">{post.profiles?.username}</span>}
+                  {post.user_id !== userId && !isSameUserAsPrev && <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1.5 px-2 drop-shadow-sm">{post.profiles?.username}</span>}
 
                   <div className="relative group/bubble max-w-full">
-                    <div className={cn("px-2 py-2 rounded-xl shadow-lg border text-sm transition-all min-w-[100px] overflow-hidden", post.user_id === userId ? "bg-[#1F1F1F] text-white border-white/5 rounded-tr-none" : "bg-card border-border rounded-tl-none")}>
+                    <div className={cn("px-3 py-2.5 rounded-2xl shadow-lg text-sm transition-all min-w-[100px] overflow-hidden", post.user_id === userId ? "bg-primary text-white shadow-primary/20 rounded-tr-sm border border-white/10" : "bg-[#1E293B] text-slate-200 border border-white/5 rounded-tl-sm shadow-black/40")}>
                       
                       {/* Quoted Content */}
                       {post.reply_to && (
@@ -348,7 +364,21 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           )}
         </AnimatePresence>
 
-        <div className="max-w-4xl w-full mx-auto flex items-end gap-2 bg-secondary/30 p-2 rounded-2xl border border-border/50">
+        {/* Typing Indicator */}
+        <AnimatePresence>
+          {typingUsers.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full mb-3 left-6 flex items-center gap-2 bg-secondary/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-lg text-[10px] text-muted-foreground font-medium uppercase tracking-widest z-30">
+              <span className="flex gap-0.5">
+                <span className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                <span className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                <span className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce"></span>
+              </span>
+              {typingUsers.length === 1 ? `${typingUsers[0]} is typing` : `${typingUsers.length} ghosts typing`}...
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="max-w-4xl w-full mx-auto flex items-end gap-2 bg-secondary/30 p-2 rounded-2xl border border-border/50 relative">
           <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -357,10 +387,18 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           >
             <ImagePlus size={20} />
           </button>
-          {/* <textarea value={newPost} onChange={(e) => setNewPost(e.target.value)} disabled={!userId} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={selectedFiles.length > 0 ? "Add a caption..." : "Ghost says..."} className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 px-1 resize-none min-h-[44px] max-h-[120px]" /> */}
          <textarea
   value={newPost}
-  onChange={(e) => setNewPost(e.target.value)}
+  onChange={(e) => {
+    setNewPost(e.target.value);
+    if (groupId && profile?.username) {
+      socket.emit('typing', { groupId, username: profile.username, isTyping: true });
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit('typing', { groupId, username: profile.username, isTyping: false });
+      }, 2000);
+    }
+  }}
   disabled={!userId}
   onKeyDown={(e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

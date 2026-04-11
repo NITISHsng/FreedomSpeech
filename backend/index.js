@@ -80,6 +80,35 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// Fetch unread counts post-last-visited
+app.post('/api/groups/unread', async (req, res) => {
+  const { recencyMap } = req.body;
+  
+  if (!recencyMap || Object.keys(recencyMap).length === 0) {
+    return res.json({});
+  }
+
+  try {
+    const promises = Object.keys(recencyMap).map(async (groupId) => {
+      const timestamp = new Date(recencyMap[groupId]).toISOString();
+      const { count, error } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', groupId)
+        .gt('created_at', timestamp);
+      
+      if (error) return { [groupId]: 0 };
+      return { [groupId]: count || 0 };
+    });
+
+    const results = await Promise.all(promises);
+    const finalMap = results.reduce((acc, obj) => ({...acc, ...obj}), {});
+    res.json(finalMap);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Fetch all groups
 app.get('/api/groups', async (req, res) => {
   const { data, error } = await supabase.from('groups').select('*');
@@ -267,6 +296,10 @@ io.on('connection', (socket) => {
   socket.on('join_room', (groupId) => {
     socket.join(groupId);
     console.log(`👤 Client ${socket.id} joined room: ${groupId}`);
+  });
+
+  socket.on('typing', ({ groupId, username, isTyping }) => {
+    socket.to(groupId).emit('user_typing', { groupId, username, isTyping });
   });
 
   socket.on('disconnect', () => {
