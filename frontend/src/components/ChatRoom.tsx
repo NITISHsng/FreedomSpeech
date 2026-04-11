@@ -319,7 +319,8 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           <button onClick={onMenuClick} className="p-2 -ml-2 hover:bg-secondary rounded-full">
             <Menu size={20} className="text-primary" />
           </button>
-          <h2 className="text-sm font-black italic tracking-tighter uppercase">{groupName}</h2>
+          <img src="/logo.webp" alt="FreedomSpeech Logo" className="w-6 h-6 object-contain" />
+          <h2 className="text-sm font-black tracking-tighter uppercase">{groupName}</h2>
         </div>
       </header>
 

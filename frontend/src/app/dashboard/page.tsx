@@ -144,12 +144,16 @@ export default function Dashboard() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
               
               <div className="relative z-10 space-y-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary to-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-primary/20 rotate-3 transition-transform duration-500 group-hover:rotate-6">
-                  <div className="text-3xl font-black text-white italic">FS</div>
+                <div className="w-20 h-20 bg-secondary/30 backdrop-blur-xl rounded-2xl mx-auto flex items-center justify-center shadow-lg border border-white/10 rotate-3 transition-transform duration-500 group-hover:rotate-6">
+                  <img 
+                    src="/logo.webp" 
+                    alt="FreedomSpeech Logo" 
+                    className="w-14 h-14 object-contain"
+                  />
                 </div>
                 
                 <div className="space-y-4">
-                  <h2 className="text-3xl font-black tracking-tight text-foreground">Welcome to <span className="text-primary pr-1">Freedom</span>Speech</h2>
+                  <h2 className="text-3xl font-black tracking-tight text-foreground">Welcome to <span className="gradient-text pr-1">FreedomSpeech</span></h2>
                   <p className="text-muted-foreground text-sm leading-relaxed">
                     A completely decentralized, secure, and anonymous communication node. Your unique ghost identity is ready.
                   </p>

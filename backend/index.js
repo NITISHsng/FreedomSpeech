@@ -43,7 +43,7 @@ app.use(express.json());
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.send('FreedomSpeech API Backend is running!');
+  res.send('VOXERA API Backend is running!');
 });
 
 // Health check

@@ -232,10 +232,16 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
   const sidebarContent = (
     <div className="w-80 h-full flex flex-col bg-card border-r border-border md:bg-card/50 md:backdrop-blur-xl pointer-events-auto shadow-2xl md:shadow-none">
       <div className="p-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Zap className="text-primary fill-primary" />
-          <span className="gradient-text tracking-tight">FreedomSpeech</span>
-        </h1>
+        <div className="flex items-center gap-3">
+          <img 
+            src="/logo.webp" 
+            alt="FreedomSpeech Logo" 
+            className="w-12 h-12 scale-[2.5] object-contain rounded-xl"
+          />
+          <h1 className="text-xl relative top-0 left-[-16px] font-black tracking-tighter gradient-text">
+            FreedomSpeech
+          </h1>
+        </div>
         <button onClick={onClose} className="md:hidden p-2 text-muted-foreground hover:bg-secondary rounded-full">
           <X size={20} />
         </button>

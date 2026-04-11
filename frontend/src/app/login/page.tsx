@@ -69,12 +69,20 @@ export default function LoginPage() {
 
         <div className="p-6 md:p-10 space-y-8 relative z-10">
           <div className="text-center space-y-4">
-            <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto ring-4 ring-primary/10 rotate-3 transition-transform hover:rotate-0">
-              <Ghost className="w-8 h-8 text-primary" />
+            <div className="w-20 h-20 bg-secondary/20 rounded-[1rem] flex items-center justify-center mx-auto transition-transform hover:scale-110 duration-500">
+              <img 
+                src="/logo.webp" 
+                alt="FreedomSpeech Logo" 
+                className="w-24 h-24 scale-350 object-contain"
+              />
             </div>
             <div className="space-y-1">
-              <h1 className="text-2xl font-black italic tracking-tighter uppercase">Ghost Portal</h1>
-              <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Freedom Node Access</p>
+              <h1 className="text-3xl font-black tracking-tighter uppercase gradient-text">
+                FreedomSpeech
+              </h1>
+              <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold opacity-70">
+                Secure Anonymous Handshake
+              </p>
             </div>
           </div>
 
