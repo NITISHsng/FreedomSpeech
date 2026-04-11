@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS posts (
   group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
   user_id TEXT REFERENCES profiles(id) ON DELETE SET NULL, 
   content TEXT NOT NULL,
+  is_edited BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -101,6 +102,7 @@ CREATE POLICY "Allow anonymous insert" ON posts FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous insert" ON comments FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous insert" ON reactions FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anonymous update/delete" ON reactions FOR ALL USING (user_id = (user_id));
+CREATE POLICY "Allow anonymous update" ON posts FOR UPDATE USING (user_id = user_id);
 CREATE POLICY "Allow anonymous insert" ON history FOR INSERT WITH CHECK (true);
 
 -- Seed Data

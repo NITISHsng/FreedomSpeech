@@ -200,6 +200,52 @@ app.post('/api/posts', async (req, res) => {
   res.json(postData);
 });
 
+// Update a post
+app.patch('/api/posts/:id', async (req, res) => {
+  const { id } = req.params;
+  const { content } = req.body;
+
+  console.log(`📝 Attempting to update post ${id} with content: ${content?.substring(0, 20)}...`);
+
+  try {
+    const { data: post, error: fetchError } = await supabase
+      .from('posts')
+      .select('user_id, group_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) {
+        console.error('❌ Fetch Error:', fetchError);
+        return res.status(500).json({ error: fetchError.message });
+    }
+
+    if (!post) {
+      console.warn(`⚠️ Post ${id} not found`);
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const { data, error } = await supabase
+      .from('posts')
+      .update({ content, is_edited: true })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+        console.error('❌ Update Error:', error);
+        throw error;
+    }
+
+    console.log(`✅ Post ${id} updated successfully`);
+    io.to(post.group_id).emit('refresh_posts');
+    res.json(data);
+  } catch (err) {
+    console.error('Update Post API Exception:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Toggle reaction
 app.post('/api/reactions', async (req, res) => {
   const { post_id, user_id, emoji, group_id } = req.body;

@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { socket, fetchAPI } from '@/lib/api';
-import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, AtSign } from 'lucide-react';
+import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, Pencil, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
-import { CommentThread } from './chat/CommentThread';
+
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
@@ -24,6 +24,8 @@ interface Post {
   reactions?: Record<string, number>;
   user_reaction?: string | null;
   profiles?: { username: string };
+  is_deleted?: boolean;
+  is_edited?: boolean;
 }
 
 interface ChatRoomProps {
@@ -31,110 +33,6 @@ interface ChatRoomProps {
   userId: string | null;
   onMenuClick?: () => void;
 }
-
-// Recursive Comment Component
-const CommentNode = ({ 
-  comment, 
-  posts, 
-  userId, 
-  depth = 0,
-  highlightedPost,
-  activeReactionPicker,
-  setActiveReactionPicker,
-  setReplyingTo,
-  handleToggleReaction
-}: { 
-  comment: Post; 
-  posts: Post[]; 
-  userId: string | null;
-  depth?: number;
-  highlightedPost: string | null;
-  activeReactionPicker: string | null;
-  setActiveReactionPicker: (id: string | null) => void;
-  setReplyingTo: (post: Post | null) => void;
-  handleToggleReaction: (id: string, emoji: string) => void;
-}) => {
-  const replies = posts.filter(r => r.reply_to_id === comment.id);
-  const maxDepth = 4; // Visual limit for indentation
-
-  const lineColors = [
-    "border-primary/30",         // Level 1
-    "border-emerald-500/30",     // Level 2
-    "border-amber-500/30",       // Level 3
-    "border-rose-500/30",        // Level 4
-    "border-indigo-500/30"       // Level 5+
-  ];
-
-  return (
-    <div className={cn(
-      "relative mt-1 group/comment",
-      depth > 0 && `ml-3 md:ml-6 border-l-2 ${lineColors[(depth - 1) % lineColors.length]} pl-3`
-    )}>
-      <motion.div 
-        id={`post-${comment.id}`}
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        className={cn(
-          "relative py-0.5 px-2.5 rounded-xl bg-secondary/10 text-xs shadow-sm transition-all duration-300",
-          highlightedPost === comment.id && "ring-4 ring-primary ring-offset-4 ring-offset-background bg-primary/5 scale-[1.02] z-10 shadow-lg shadow-primary/20"
-        )}
-      >
-        <div className="flex items-center justify-between mb-0.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{comment.profiles?.username}</span>
-            <span className="text-[8px] text-muted-foreground/50">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-          <div className="flex items-center gap-1.5 opacity-0 group-hover/comment:opacity-100 transition-opacity">
-            <button onClick={() => setReplyingTo(comment)} className="p-1 hover:bg-primary/20 rounded text-[8px] font-black uppercase text-primary transition-colors">
-              Reply
-            </button>
-            <button onClick={() => setActiveReactionPicker(activeReactionPicker === comment.id ? null : comment.id)} className="p-1 hover:bg-secondary rounded transition-colors"><Smile size={10} /></button>
-          </div>
-        </div>
-        
-        <p className="text-slate-400 leading-tight pr-6">{comment.content}</p>
-
-        {/* Reaction Picker for Comment */}
-        <AnimatePresence>
-          {activeReactionPicker === comment.id && (
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 5 }} className="absolute bottom-full mb-1 z-50 flex gap-0.5 p-0.5 bg-card border border-border rounded-lg shadow-xl scale-75 origin-bottom">
-              {EMOJI_OPTIONS.map(emoji => <button key={emoji} onClick={() => handleToggleReaction(comment.id, emoji)} className="w-6 h-6 flex items-center justify-center rounded text-base hover:bg-primary/10">{emoji}</button>)}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Comment Reactions */}
-        {comment.reactions && Object.keys(comment.reactions).length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(comment.reactions).map(([emoji, count]) => (
-              <button key={emoji} onClick={() => handleToggleReaction(comment.id, emoji)} className={cn("px-1 py-0 rounded-full border text-[8px] font-bold", comment.user_reaction === emoji ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary/50 border-border")}>{emoji} {count}</button>
-            ))}
-          </div>
-        )}
-      </motion.div>
-
-      {/* Recursive Replies */}
-      {replies.length > 0 && (
-        <div className="mt-0.5">
-          {replies.map(reply => (
-            <CommentNode 
-              key={reply.id} 
-              comment={reply} 
-              posts={posts} 
-              userId={userId} 
-              depth={depth + 1}
-              highlightedPost={highlightedPost}
-              activeReactionPicker={activeReactionPicker}
-              setActiveReactionPicker={setActiveReactionPicker}
-              setReplyingTo={setReplyingTo}
-              handleToggleReaction={handleToggleReaction}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -145,6 +43,8 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [loading, setLoading] = useState(false);
   const [activeReactionPicker, setActiveReactionPicker] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Post | null>(null);
+  const [commentingTo, setCommentingTo] = useState<Post | null>(null);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [groupName, setGroupName] = useState('Global');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,7 +63,6 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const lastPostCount = useRef(0);
 
   const [highlightedPost, setHighlightedPost] = useState<string | null>(null);
-  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => setHasMounted(true), []);
 
@@ -260,10 +159,11 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     if (posts.length > lastPostCount.current) {
       const lastPost = posts[posts.length - 1];
       const isMyMessage = lastPost.user_id === userId;
+      const isThread = lastPost.content?.startsWith('[THREAD]');
 
-      if (isMyMessage || isAtBottom) {
+      if ((isMyMessage || isAtBottom) && !isThread) {
         scrollToBottom(true);
-      } else {
+      } else if (!isAtBottom && !isThread) {
         setUnreadCountInSession(prev => prev + (posts.length - lastPostCount.current));
       }
     }
@@ -356,14 +256,44 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     setLoading(true);
     
     try {
+      if (editingPost) {
+        let finalContent = newPost.trim();
+        if (editingPost.content.startsWith('[THREAD]')) {
+          finalContent = `[THREAD] ${finalContent}`;
+        }
+
+        const body = { 
+          content: finalContent
+        };
+
+        const postData = await fetchAPI(`/api/posts/${editingPost.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body)
+        });
+
+        if (postData) {
+          setNewPost('');
+          setEditingPost(null);
+          fetchPosts(); // Re-fetch immediately to ensure UI is in sync
+        }
+        return;
+      }
+
       const mediaUrls = await uploadMedia();
       
+      let finalContent = newPost.trim();
+      const targetId = replyingTo?.id || commentingTo?.id;
+
+      if (commentingTo) {
+        finalContent = `[THREAD] ${finalContent}`;
+      }
+
       const body = { 
         group_id: groupId, 
         user_id: userId, 
-        content: newPost.trim(),
+        content: finalContent,
         media_urls: mediaUrls,
-        reply_to_id: replyingTo ? replyingTo.id : undefined
+        reply_to_id: targetId
       };
 
       const postData = await fetchAPI('/api/posts', {
@@ -374,10 +304,12 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       if (postData) {
         setNewPost('');
         setReplyingTo(null);
+        setCommentingTo(null);
+        setEditingPost(null);
         setSelectedFiles([]);
       }
     } catch (err) { 
-      console.error("Failed to send post via API:", err); 
+      console.error("Failed to send/update post via API:", err); 
     } finally { 
       setLoading(false); 
     }
@@ -402,6 +334,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     }
   }
 
+
   const formatDateLabel = (dateStr: string) => {
     const d = new Date(dateStr);
     const today = new Date();
@@ -411,6 +344,202 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
   };
+
+  const THREAD_COLORS = [
+    'border-primary/60',
+    'border-indigo-400/60',
+    'border-violet-400/60',
+    'border-fuchsia-400/60',
+    'border-rose-400/60',
+    'border-amber-400/60',
+    'border-emerald-400/60',
+  ];
+
+  const buildTree = (posts: Post[]) => {
+    const map: Record<string, any> = {};
+    const rootNodes: any[] = [];
+
+    posts.forEach(post => {
+      map[post.id] = { ...post, children: [] };
+    });
+
+    posts.forEach(post => {
+      const isThread = post.content?.startsWith('[THREAD]');
+      if (post.reply_to_id && isThread && map[post.reply_to_id]) {
+        map[post.reply_to_id].children.push(map[post.id]);
+      } else {
+        rootNodes.push(map[post.id]);
+      }
+    });
+
+    return rootNodes;
+  };
+
+  const renderPost = (post: any, index: number, depth = 0, isSameUserAsPrev = false, showDateHeader = false) => {
+    const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
+    const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1]?.created_at).getTime() <= initialLastSeen.current);
+    const hasThreadFlag = post.content?.startsWith('[THREAD]');
+    const content = hasThreadFlag ? post.content.replace('[THREAD]', '').trim() : post.content;
+    const isDeleted = post.is_deleted || content === '[DELETED]';
+
+    const threadColor = THREAD_COLORS[depth % THREAD_COLORS.length];
+
+    return (
+      <div key={`post-container-${post.id}`} className={cn("flex flex-col", depth > 0 ? `ml-2 md:ml-4 border-l-2 ${threadColor} pl-2.5 py-0.5 mt-0.5` : (index > 0 ? (isSameUserAsPrev ? "mt-0.5" : "mt-2.5") : ""))}>
+        {isFirstNew && depth === 0 && (
+          <div ref={firstUnreadRef} className="flex justify-center my-4 relative">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-primary/30"></div></div>
+            <span className="relative px-3 py-1 rounded-full bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 shadow-sm">
+              Unread Messages
+            </span>
+          </div>
+        )}
+        {showDateHeader && depth === 0 && (
+          <div className="flex justify-center mb-4 mt-1">
+            <span className="px-3 py-1 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
+          </div>
+        )}
+        
+        <motion.div 
+          id={`post-${post.id}`}
+          initial={{ opacity: 0, scale: 0.98 }} 
+          animate={{ opacity: 1, scale: 1 }} 
+          whileHover={{ scale: 1.005 }}
+          className={cn(
+            depth > 0 ? "max-w-full" : "max-w-[85%] md:max-w-xl group flex flex-col relative transition-all duration-300", 
+            post.user_id === userId && depth === 0 ? "ml-auto items-end text-right" : "mr-auto items-start text-left",
+            highlightedPost === post.id && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg scale-[1.02] z-50 shadow-[0_0_30px_rgba(59,130,246,0.3)] bg-primary/5"
+          )}
+        >
+          {(post.user_id !== userId || depth > 0) && !isSameUserAsPrev && (
+            <div className="flex items-center gap-1.5 mb-0.5 px-1.5">
+              <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-wider drop-shadow-sm">{post.profiles?.username}</span>
+              <span className="w-1 h-1 rounded-full bg-slate-600" />
+            </div>
+          )}
+
+          <div className={cn("relative group/bubble", depth > 0 ? "w-full" : "max-w-full")}>
+            <div className={cn("px-2 py-1.5 rounded-xl shadow-md text-[13px] transition-all min-w-[60px] overflow-hidden relative", post.user_id === userId ? "bg-primary text-white shadow-primary/20 rounded-tr-none border border-white/10" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40")}>
+              {post.is_edited && (
+                <span className={cn(
+                  "absolute top-1 right-1.5 text-[7px] font-black uppercase tracking-tighter",
+                  post.user_id === userId ? "text-white/40" : "text-slate-500/60"
+                )}>
+                  Edited
+                </span>
+              )}
+              
+              {isDeleted ? (
+                <div className="flex items-center gap-2 py-1 opacity-60 italic select-none">
+                  <Trash2 size={12} className="shrink-0" />
+                  <span className="text-[11px] leading-tight flex-1">Message was deleted by {post.profiles?.username || 'User'}</span>
+                </div>
+              ) : (
+                <>
+                  {/* Quoted Content (Only for non-threaded citation replies) */}
+                  {post.reply_to && !hasThreadFlag && (
+                    <div 
+                      onClick={() => post.reply_to_id && jumpToMessage(post.reply_to_id)}
+                      className={cn(
+                        "mb-2 p-1.5 rounded-lg border-l-2 text-[10px] bg-black/10 flex flex-col gap-0.5 cursor-pointer hover:bg-black/20 transition-all text-left", 
+                        post.user_id === userId ? "border-white/30" : "border-primary/50"
+                      )}
+                    >
+                      <span className="font-bold opacity-80 uppercase text-[8px]">{post.reply_to.profiles?.username}</span>
+                      <p className="line-clamp-1 italic opacity-70">{post.reply_to.content}</p>
+                    </div>
+                  )}
+
+                  {/* Image Gallery */}
+                  {post.media_urls && post.media_urls.length > 0 && (
+                    <div className={cn(
+                      "mb-2 grid gap-1 rounded-lg overflow-hidden cursor-pointer max-w-[150px]",
+                      post.media_urls.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                    )}>
+                      {post.media_urls.map((url: string, i: number) => (
+                        <div key={i} onClick={() => setLightboxImage(url)} className={cn("relative group/img", post.media_urls!.length === 3 && i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-square")}>
+                          <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <Maximize2 size={16} className="text-white drop-shadow-lg" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="leading-snug whitespace-pre-wrap pr-8">{content}</p>
+
+                  <div className={cn(
+                    "overflow-hidden transition-all duration-300 ease-in-out",
+                    (commentingTo?.id === post.id || replyingTo?.id === post.id) 
+                      ? "max-h-12 opacity-100 mt-1.5" 
+                      : "max-h-0 opacity-0 group-hover/bubble:max-h-12 group-hover/bubble:opacity-100 group-hover/bubble:mt-1.5"
+                  )}>
+                    <div className="pt-1 border-t border-white/5 flex items-center gap-1">
+                      <button onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} className="p-1 px-1.5 rounded hover:bg-white/5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+                        <Smile size={10} /> {post.user_reaction ? 'Reacted' : 'React'}
+                      </button>
+                      <button onClick={() => { setCommentingTo(null); setReplyingTo(post); scrollToBottom(true); }} className="p-1 px-1.5 rounded hover:bg-white/5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+                        <Reply size={10} /> Reply
+                      </button>
+                      <button onClick={() => { setReplyingTo(null); setCommentingTo(post); }} className="p-1 px-1.5 rounded hover:bg-white/5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+                        <MessageSquare size={10} /> Comment
+                      </button>
+                      {post.user_id === userId && (
+                        <button 
+                          onClick={() => { 
+                            setReplyingTo(null); 
+                            setCommentingTo(null); 
+                            setEditingPost(post); 
+                            setNewPost(content);
+                            // Visual feedback: scroll to input
+                            document.querySelector('textarea')?.focus();
+                          }} 
+                          className="p-1 px-1.5 rounded hover:bg-white/10 text-[9px] font-bold uppercase tracking-wider text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+                        >
+                          <Pencil size={10} /> Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="absolute bottom-1 right-1.5 flex items-center gap-1 opacity-60">
+                {isNew && <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />}
+                <span className="text-[9px] font-medium leading-none text-slate-400">{new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {activeReactionPicker === post.id && (
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 5 }} className={cn("absolute bottom-full mb-3 z-50 flex gap-1 p-1 bg-card border border-border rounded-xl shadow-2xl", post.user_id === userId && depth === 0 ? "right-0" : "left-0")}>
+                  {EMOJI_OPTIONS.map(emoji => <button key={emoji} onClick={() => handleToggleReaction(post.id, emoji)} className="w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:bg-primary/10">{emoji}</button>)}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {post.reactions && Object.keys(post.reactions).length > 0 && (
+              <div className={cn("flex flex-wrap gap-1 mt-1.5", post.user_id === userId && depth === 0 ? "justify-end pr-10" : "justify-start")}>
+                {Object.entries(post.reactions).map(([emoji, count]: [string, any]) => (
+                  <button key={emoji} onClick={() => handleToggleReaction(post.id, emoji)} className={cn("px-1.5 py-0.5 rounded-full border text-[9px] font-bold", post.user_reaction === emoji ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary/50 border-border")}>{emoji} {count}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Child Comments */}
+        {post.children && post.children.length > 0 && (
+          <div className="flex flex-col">
+            {post.children.map((child: any, idx: number) => renderPost(child, idx, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const threadedPosts = buildTree(posts);
 
   if (!hasMounted) return null;
 
@@ -451,144 +580,14 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 custom-scrollbar">
         <AnimatePresence initial={false}>
-          {(() => {
-            const parentPosts = posts.filter(p => !p.reply_to_id);
-            return parentPosts.map((post, index) => {
-              const comments = posts.filter(c => c.reply_to_id === post.id);
-              const isExpanded = expandedThreads.has(post.id);
-              
-              const currentDate = new Date(post.created_at).toDateString();
-              const prevDate = index > 0 ? new Date(parentPosts[index - 1].created_at).toDateString() : null;
-              const showDateHeader = currentDate !== prevDate;
-              const isSameUserAsPrev = index > 0 && parentPosts[index - 1].user_id === post.user_id && !showDateHeader;
+          {threadedPosts.map((post, index) => {
+            const currentDate = new Date(post.created_at).toDateString();
+            const prevDate = index > 0 ? new Date(threadedPosts[index - 1].created_at).toDateString() : null;
+            const showDateHeader = currentDate !== prevDate;
+            const isSameUserAsPrev = index > 0 && threadedPosts[index - 1].user_id === post.user_id && !showDateHeader;
             
-            const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
-            const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1].created_at).getTime() <= initialLastSeen.current);
-
-            return (
-              <div key={`post-container-${post.id}`} className={cn("flex flex-col", index > 0 ? (isSameUserAsPrev ? "mt-1.5" : "mt-6") : "")}>
-                {isFirstNew && (
-                  <div ref={firstUnreadRef} className="flex justify-center my-8 relative">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-primary/30"></div></div>
-                    <span className="relative px-4 py-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 shadow-sm">
-                      Unread Messages
-                    </span>
-                  </div>
-                )}
-                {showDateHeader && (
-                  <div className="flex justify-center mb-6 mt-2">
-                    <span className="px-4 py-1.5 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
-                  </div>
-                )}
-                
-                <motion.div 
-                  id={`post-${post.id}`}
-                  initial={{ opacity: 0, y: 10 }} 
-                  animate={{ opacity: 1, y: 0 }} 
-                  whileHover={{ scale: 1.01 }}
-                  className={cn(
-                    "max-w-[85%] md:max-w-xl group flex flex-col relative transition-all duration-700", 
-                    post.user_id === userId ? "ml-auto items-end" : "mr-auto items-start",
-                    highlightedPost === post.id && "ring-4 ring-primary ring-offset-4 ring-offset-background rounded-2xl scale-[1.05] z-50 shadow-[0_0_50px_rgba(59,130,246,0.5)] bg-primary/10"
-                  )}
-                >
-                  {post.user_id !== userId && !isSameUserAsPrev && <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1.5 px-2 drop-shadow-sm">{post.profiles?.username}</span>}
-
-                  <div className="relative group/bubble max-w-full">
-                    <div className={cn("px-3 py-2.5 rounded-2xl shadow-lg text-sm transition-all min-w-[100px] overflow-hidden", post.user_id === userId ? "bg-primary text-white shadow-primary/20 rounded-tr-sm border border-white/10" : "bg-[#1E293B] text-slate-200 border border-white/5 rounded-tl-sm shadow-black/40")}>
-                      
-                      {/* Quoted Content */}
-                      {post.reply_to && (
-                        <div 
-                          onClick={() => post.reply_to_id && jumpToMessage(post.reply_to_id)}
-                          className={cn(
-                            "mb-3 p-2 rounded-lg border-l-2 text-[11px] bg-black/10 flex flex-col gap-1 cursor-pointer hover:bg-black/20 transition-all text-left", 
-                            post.user_id === userId ? "border-white/30" : "border-primary/50"
-                          )}
-                        >
-                          <span className="font-bold opacity-80 uppercase text-[9px]">{post.reply_to.profiles?.username}</span>
-                          <p className="line-clamp-2 italic opacity-70">{post.reply_to.content}</p>
-                        </div>
-                      )}
-
-                      {/* Image Gallery */}
-                      {post.media_urls && post.media_urls.length > 0 && (
-                        <div className={cn(
-                          "mb-3 grid gap-1 rounded-xl overflow-hidden cursor-pointer max-w-[200px]",
-                          post.media_urls.length === 1 ? "grid-cols-1" : "grid-cols-2"
-                        )}>
-                          {post.media_urls.map((url, i) => (
-                            <div key={i} onClick={() => setLightboxImage(url)} className={cn("relative group/img", post.media_urls!.length === 3 && i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-square")}>
-                              <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                <Maximize2 size={20} className="text-white drop-shadow-lg" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <p className="leading-relaxed whitespace-pre-wrap pr-10">{post.content}</p>
-                      <div className="absolute bottom-1.5 right-2 flex items-center gap-1.5 opacity-60">
-                        {isNew && <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />}
-                        <span className="text-[10px] font-medium leading-none">{new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className={cn("absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all z-20", post.user_id === userId ? "-left-28 flex-row-reverse" : "-right-28")}>
-                      <button onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary transition-all active:scale-90" title="React"><Smile size={14} /></button>
-                      <button onClick={() => setReplyingTo(post)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary transition-all active:scale-90" title="Comment"><MessageSquare size={14} /></button>
-                      <button onClick={() => setReplyingTo(post)} className="p-2 rounded-full bg-card border border-border shadow-md hover:bg-secondary transition-all active:scale-90" title="Quote Reply"><Reply size={14} /></button>
-                    </div>
-
-                    <AnimatePresence>
-                      {activeReactionPicker === post.id && (
-                        <motion.div initial={{ opacity: 0, scale: 0.9, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 5 }} className={cn("absolute bottom-full mb-3 z-50 flex gap-1 p-1 bg-card border border-border rounded-xl shadow-2xl", post.user_id === userId ? "right-0" : "left-0")}>
-                          {EMOJI_OPTIONS.map(emoji => <button key={emoji} onClick={() => handleToggleReaction(post.id, emoji)} className="w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:bg-primary/10">{emoji}</button>)}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {post.reactions && Object.keys(post.reactions).length > 0 && (
-                      <div className={cn("flex flex-wrap gap-1 mt-1.5", post.user_id === userId ? "justify-end mr-10" : "justify-start")}>
-                        {Object.entries(post.reactions).map(([emoji, count]) => (
-                          <button key={emoji} onClick={() => handleToggleReaction(post.id, emoji)} className={cn("px-1.5 py-0.5 rounded-full border text-[9px] font-bold", post.user_reaction === emoji ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary/50 border-border")}>{emoji} {count}</button>
-                        ))}
-                      </div>
-                    )}
-
-                    {comments.length > 0 && (
-                      <div className={cn("flex items-center gap-1.5 mt-2 px-2", post.user_id === userId ? "justify-end mr-10" : "justify-start")}>
-                        <MessageSquare size={10} className="text-primary/60" />
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Comment Section Inline (Recursive) */}
-                  {(comments.length > 0 || replyingTo?.id === post.id) && (
-                    <div className="w-full mt-4">
-                       {comments.map((comment) => (
-                          <CommentNode 
-                            key={comment.id}
-                            comment={comment}
-                            posts={posts}
-                            userId={userId}
-                            depth={1}
-                            highlightedPost={highlightedPost}
-                            activeReactionPicker={activeReactionPicker}
-                            setActiveReactionPicker={setActiveReactionPicker}
-                            setReplyingTo={setReplyingTo}
-                            handleToggleReaction={handleToggleReaction}
-                          />
-                       ))}
-                    </div>
-                  )}
-                </motion.div>
-              </div>
-            );
-          })})()}
+            return renderPost(post, index, 0, isSameUserAsPrev, showDateHeader);
+          })}
         </AnimatePresence>
       </div>
 
@@ -636,17 +635,46 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           )}
         </AnimatePresence>
 
-        {/* Comment/Reply Preview */}
+        {/* Reply Preview */}
+        <AnimatePresence>
+          {commentingTo && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-indigo-500/5 rounded-xl overflow-hidden border-l-4 border-indigo-500 p-3 flex justify-between items-center shadow-inner">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase text-indigo-500 flex items-center gap-1">
+                  <MessageSquare size={10} /> Commenting on {commentingTo.profiles?.username}
+                </span>
+                <p className="text-xs text-muted-foreground truncate italic">{commentingTo.content.replace('[THREAD]', '')}</p>
+              </div>
+              <button onClick={() => setCommentingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"><X size={14} /></button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <AnimatePresence>
           {replyingTo && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center bg-card">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-black uppercase text-primary flex items-center gap-1">
-                  <AtSign size={10} /> {replyingTo.reply_to_id ? "Replying to comment by" : "Commenting on message by"} {replyingTo.profiles?.username}
-                </span>
-                <p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p>
-              </div>
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center">
+              <div className="flex flex-col gap-0.5"><span className="text-[10px] font-bold uppercase text-primary">Replying to {replyingTo.profiles?.username}</span><p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p></div>
               <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"><X size={14} /></button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {editingPost && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-amber-500/5 rounded-xl overflow-hidden border-l-4 border-amber-500 p-3 flex justify-between items-center">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase text-amber-500">Editing Message</span>
+                <p className="text-xs text-muted-foreground truncate italic">{editingPost.content.replace('[THREAD]', '')}</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setEditingPost(null);
+                  setNewPost('');
+                }} 
+                className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"
+              >
+                <X size={14} />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -696,11 +724,19 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   placeholder={selectedFiles.length > 0 ? "Add a caption..." : "Ghost says..."}
   className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm py-2 px-1 resize-none h-10 min-h-[44px] max-h-[120px]"
 />
-          <button onClick={handleSend} disabled={(!newPost.trim() && !selectedFiles.length) || loading || !userId} className="p-3 bg-primary text-white rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2">
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          <button 
+            onClick={handleSend} 
+            disabled={(!newPost.trim() && !selectedFiles.length) || loading || !userId} 
+            className={cn(
+              "p-3 rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2",
+              editingPost ? "bg-amber-500 text-white" : "bg-primary text-white"
+            )}
+           >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : (editingPost ? <Check size={18} /> : <Send size={18} />)}
           </button>
         </div>
       </div>
+
 
     </div>
   );
