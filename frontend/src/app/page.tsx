@@ -55,7 +55,7 @@ export default function LandingPage() {
           </h2>
 
           <div className="max-w-4xl mx-auto space-y-6 mb-12 px-4">
-            <p className="text-[16px] md:text-4xl font-bold tracking-tight text-foreground/90 leading-tight">
+            <p className="text-[13px] md:text-4xl font-bold tracking-tight text-foreground/90 leading-tight">
               No identity. Just truth. And your voice.
             </p>
             <p className="text-[13px] md:text-2xl text-muted-foreground/80 font-medium italic">
@@ -96,12 +96,9 @@ export default function LandingPage() {
             </motion.div>
             <Link
               href="#features"
-              className="px-10 py-5 bg-secondary/50 backdrop-blur-md rounded-2xl font-bold hover:bg-secondary transition-all text-lg flex flex-col items-center gap-1"
+              className="px-10 py-5 hidden md:block bg-secondary/50 backdrop-blur-md rounded-2xl font-bold hover:bg-secondary transition-all text-lg flex flex-col items-center gap-1"
             >
               <span>How it works</span>
-              <span className="text-xs opacity-70 font-medium tracking-wide">
-                কিভাবে এটি কাজ করে
-              </span>
             </Link>
           </div>
         </motion.div>
