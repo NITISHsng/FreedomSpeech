@@ -165,12 +165,31 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
       });
   }, [groups, searchTerm, recencyMap]);
 
+  useEffect(() => {
+    if (activeGroupId) {
+      const updateRecency = () => {
+        setRecencyMap(prev => {
+          const updated = { ...prev, [activeGroupId]: Date.now() };
+          localStorage.setItem('freedom_recency', JSON.stringify(updated));
+          return updated;
+        });
+        setUnreadCounts(prev => ({ ...prev, [activeGroupId]: 0 }));
+      };
+      
+      updateRecency();
+      
+      return () => {
+        // Update to Date.now() when LEAVING the room so we don't get 
+        // unread notifications for messages we saw while active
+        updateRecency();
+      };
+    }
+  }, [activeGroupId]);
+
   const handleGroupClick = (groupId: string) => {
-    onGroupSelect(groupId);
-    const newRecency = { ...recencyMap, [groupId]: Date.now() };
-    setRecencyMap(newRecency);
-    localStorage.setItem('freedom_recency', JSON.stringify(newRecency));
-    setUnreadCounts(prev => ({ ...prev, [groupId]: 0 }));
+    if (groupId !== activeGroupId) {
+      onGroupSelect(groupId);
+    }
   };
 
   const handleCreateBooth = async (e: React.FormEvent) => {
@@ -317,7 +336,7 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group border border-transparent",
                       isActive
-                        ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-primary/20 bg-[length:200%_auto] animate-gradient" 
+                        ? "bg-[#0b0b14] text-white shadow-md border border-white/20"
                         : isVisited
                           ? "bg-secondary/60 text-foreground hover:bg-secondary/80 hover:border-border/50"
                           : "bg-transparent text-muted-foreground hover:bg-secondary/30 hover:text-foreground"
