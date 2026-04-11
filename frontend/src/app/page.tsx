@@ -35,7 +35,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative z-10 container mx-auto px-6 pt-12 pb-32 text-center">
+      <section className="relative z-10 container mx-auto px-6 pb-32 text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -45,7 +45,7 @@ export default function LandingPage() {
             <span className="text-[28px] md:text-[48px]">
               Unfiltered thoughts.
             </span>
-            <span className="block gradient-text">Zero identity.</span>
+            <span className="block gradient-text text-[44px] md:text-[90px]">Zero identity.</span>
           </h1>
           <h2
             className="text-6xl md:text-9xl font-black mb-12 tracking-tighter text-transparent drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
@@ -55,10 +55,10 @@ export default function LandingPage() {
           </h2>
 
           <div className="max-w-4xl mx-auto space-y-6 mb-12 px-4">
-            <p className="text-2xl md:text-4xl font-bold tracking-tight text-foreground/90 leading-tight">
+            <p className="text-[16px] md:text-4xl font-bold tracking-tight text-foreground/90 leading-tight">
               No identity. Just truth. And your voice.
             </p>
-            <p className="text-lg md:text-2xl text-muted-foreground/80 font-medium italic">
+            <p className="text-[13px] md:text-2xl text-muted-foreground/80 font-medium italic">
               কোনো পরিচয় নয় — শুধু সত্য, শুধু আপনার কণ্ঠস্বর।
             </p>
           </div>
