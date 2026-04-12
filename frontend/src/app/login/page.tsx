@@ -84,7 +84,7 @@ export default function LoginPage() {
               <img 
                 src="/logo.webp" 
                 alt="FreedomSpeech Logo" 
-                className="w-full h-full object-contain p-2"
+                className="w-44 h-44 scale-350 object-contain p-2"
               />
             </div>
             <div className="space-y-1">

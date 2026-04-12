@@ -50,7 +50,15 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const [groupName, setGroupName] = useState('Global');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [newPost]);
   // Image Selection State
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; preview: string }[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -443,7 +451,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           }}
           className={cn(
             depth > 0 ? "max-w-full" : "max-w-[85%] md:max-w-xl group flex flex-col relative transition-all duration-300", 
-            isOnRight ? "ml-auto items-end text-right" : "mr-auto items-start text-left",
+            isOnRight ? "ml-auto items-end text-left" : "mr-auto items-start text-left",
             highlightedPost === post.id && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg scale-[1.02] z-50 shadow-[0_0_30px_rgba(59,130,246,0.3)] bg-primary/5"
           )}
         >
@@ -759,31 +767,34 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
         {/* Reply Preview */}
         <AnimatePresence>
           {commentingTo && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-indigo-500/5 rounded-xl overflow-hidden border-l-4 border-indigo-500 p-3 flex justify-between items-center shadow-inner">
-              <div className="flex flex-col gap-0.5">
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-indigo-500/5 rounded-xl overflow-hidden border-l-4 border-indigo-500 p-3 flex justify-between items-center shadow-inner gap-3">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-[10px] font-bold uppercase text-indigo-500 flex items-center gap-1">
                   <MessageSquare size={10} /> Commenting on {commentingTo.profiles?.username}
                 </span>
                 <p className="text-xs text-muted-foreground truncate italic">{commentingTo.content.replace('[THREAD]', '')}</p>
               </div>
-              <button onClick={() => setCommentingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"><X size={14} /></button>
+              <button onClick={() => setCommentingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive shrink-0"><X size={14} /></button>
             </motion.div>
           )}
         </AnimatePresence>
 
         <AnimatePresence>
           {replyingTo && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center">
-              <div className="flex flex-col gap-0.5"><span className="text-[10px] font-bold uppercase text-primary">Replying to {replyingTo.profiles?.username}</span><p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p></div>
-              <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"><X size={14} /></button>
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center gap-3">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <span className="text-[10px] font-bold uppercase text-primary">Replying to {replyingTo.profiles?.username}</span>
+                <p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive shrink-0"><X size={14} /></button>
             </motion.div>
           )}
         </AnimatePresence>
 
         <AnimatePresence>
           {editingPost && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-amber-500/5 rounded-xl overflow-hidden border-l-4 border-amber-500 p-3 flex justify-between items-center">
-              <div className="flex flex-col gap-0.5">
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-amber-500/5 rounded-xl overflow-hidden border-l-4 border-amber-500 p-3 flex justify-between items-center gap-3">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-[10px] font-bold uppercase text-amber-500">Editing Message</span>
                 <p className="text-xs text-muted-foreground truncate italic">{editingPost.content.replace('[THREAD]', '')}</p>
               </div>
@@ -792,7 +803,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                   setEditingPost(null);
                   setNewPost('');
                 }} 
-                className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive"
+                className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive shrink-0"
               >
                 <X size={14} />
               </button>
@@ -823,28 +834,23 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           >
             <ImagePlus size={20} />
           </button>
-         <textarea
-  value={newPost}
-  onChange={(e) => {
-    setNewPost(e.target.value);
-    if (groupId && profile?.username) {
-      socket.emit('typing', { groupId, username: profile.username, isTyping: true });
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        socket.emit('typing', { groupId, username: profile.username, isTyping: false });
-      }, 2000);
-    }
-  }}
-  disabled={!userId}
-  onKeyDown={(e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }}
-  placeholder={selectedFiles.length > 0 ? "Add a caption..." : "Ghost says..."}
-  className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm py-2 px-1 resize-none h-10 min-h-[44px] max-h-[120px]"
-/>
+          <textarea
+            ref={textareaRef}
+            value={newPost}
+            onChange={(e) => {
+              setNewPost(e.target.value);
+              if (groupId && profile?.username) {
+                socket.emit('typing', { groupId, username: profile.username, isTyping: true });
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = setTimeout(() => {
+                  socket.emit('typing', { groupId, username: profile.username, isTyping: false });
+                }, 2000);
+              }
+            }}
+            disabled={!userId}
+            placeholder={selectedFiles.length > 0 ? "Add a caption..." : "Ghost says..."}
+            className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm py-2 px-1 resize-none min-h-[44px] max-h-[120px] transition-all duration-200"
+          />
           <button 
             onClick={handleSend} 
             disabled={(!newPost.trim() && !selectedFiles.length) || loading || !userId} 
