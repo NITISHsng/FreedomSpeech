@@ -36,6 +36,7 @@ yarn-error.log*
 # Ignore specific files that were accidentally added
 " .env.local"
 **/ .env.local"
+/public/firebase-messaging-sw.js
 
 # vercel
 .vercel
