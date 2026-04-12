@@ -399,7 +399,8 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     return rootNodes;
   };
 
-  const renderPost = (post: any, index: number, depth = 0, isSameUserAsPrev = false, showDateHeader = false) => {
+  const renderPost = (post: any, index: number, depth = 0, isSameUserAsPrev = false, showDateHeader = false, parentOnRight = false) => {
+    const isOnRight = depth === 0 ? post.user_id === userId : parentOnRight;
     const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
     const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1]?.created_at).getTime() <= initialLastSeen.current);
     const hasThreadFlag = post.content?.startsWith('[THREAD]');
@@ -409,7 +410,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     const threadColor = THREAD_COLORS[depth % THREAD_COLORS.length];
 
     return (
-      <div key={`post-container-${post.id}`} className={cn("flex flex-col", depth > 0 ? `ml-2 md:ml-4 border-l-2 ${threadColor} pl-2.5 py-0.5 mt-0.5` : (index > 0 ? (isSameUserAsPrev ? "mt-0.5" : "mt-2.5") : ""))}>
+      <div key={`post-container-${post.id}`} className={cn("flex flex-col", depth > 0 ? (isOnRight ? `mr-2 md:mr-4 border-r-2 ${threadColor} pr-2.5 py-0.5 mt-0.5` : `ml-2 md:ml-4 border-l-2 ${threadColor} pl-2.5 py-0.5 mt-0.5`) : (index > 0 ? (isSameUserAsPrev ? "mt-0.5" : "mt-2.5") : ""), isOnRight && "items-end")}>
         {isFirstNew && depth === 0 && (
           <div ref={firstUnreadRef} className="flex justify-center my-4 relative">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-primary/30"></div></div>
@@ -419,7 +420,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           </div>
         )}
         {showDateHeader && depth === 0 && (
-          <div className="flex justify-center mb-4 mt-1">
+           <div className="flex justify-center mb-4 mt-1 w-full">
             <span className="px-3 py-1 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
           </div>
         )}
@@ -433,7 +434,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.6}
           onDragEnd={(_, info) => {
-            if (Math.abs(info.offset.x) > 80) {
+            if (Math.abs(info.offset.x) > 40) {
               setCommentingTo(null);
               setReplyingTo(post);
               scrollToBottom(true);
@@ -442,13 +443,15 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           }}
           className={cn(
             depth > 0 ? "max-w-full" : "max-w-[85%] md:max-w-xl group flex flex-col relative transition-all duration-300", 
-            post.user_id === userId && depth === 0 ? "ml-auto items-end text-right" : "mr-auto items-start text-left",
+            isOnRight ? "ml-auto items-end text-right" : "mr-auto items-start text-left",
             highlightedPost === post.id && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg scale-[1.02] z-50 shadow-[0_0_30px_rgba(59,130,246,0.3)] bg-primary/5"
           )}
         >
           {(post.user_id !== userId || depth > 0) && !isSameUserAsPrev && (
-            <div className="flex items-center gap-1.5 mb-0.5 px-1.5">
-              <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-wider drop-shadow-sm">{post.profiles?.username}</span>
+            <div className={cn("flex items-center gap-1.5 mb-0.5 px-1.5", isOnRight && "flex-row-reverse")}>
+              <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-wider drop-shadow-sm">
+                {post.user_id === userId ? "You" : post.profiles?.username}
+              </span>
               <span className="w-1 h-1 rounded-full bg-slate-600" />
             </div>
           )}
@@ -465,7 +468,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
               setActiveMessageId(activeMessageId === post.id ? null : post.id);
             }}
           >
-            <div className={cn("px-2 py-1.5 rounded-xl shadow-md text-[13px] transition-all min-w-[60px] overflow-hidden relative", post.user_id === userId ? "bg-primary text-white shadow-primary/20 rounded-tr-none border border-white/10" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40")}>
+            <div className={cn("px-2 py-1.5 rounded-xl shadow-md text-[13px] transition-all overflow-hidden relative", post.user_id === userId ? "bg-[#0F172D] w-fit  text-white shadow-primary/20 rounded-tr-none border border-white/10 ml-auto" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40 mr-auto")}>
               {post.is_edited && !isDeleted && (
                 <span className={cn(
                   "absolute top-1 right-1.5 text-[7px] font-black uppercase tracking-tighter",
@@ -479,7 +482,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                 <div className="flex items-center gap-3 py-1.5 opacity-40 italic select-none">
                   <Trash2 size={14} className="shrink-0 text-slate-400" />
                   <span className="text-[11px] font-medium leading-tight text-slate-300 tracking-tight">
-                    Message was deleted by {post.profiles?.username || 'Ghost'}
+                    Message was deleted by {post.user_id === userId ? "You" : (post.profiles?.username || 'Ghost')}
                   </span>
                 </div>
               ) : (
@@ -515,7 +518,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                     </div>
                   )}
 
-                  <p className="leading-snug whitespace-pre-wrap pr-8">{content}</p>
+                  <p className="leading-snug whitespace-pre-wrap pr-8 w-fit">{content}</p>
 
                   <div className={cn(
                     "overflow-hidden transition-all duration-300 ease-in-out",
@@ -523,6 +526,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                       ? "max-h-12 opacity-100 mt-1.5" 
                       : "max-h-0 opacity-0 group-hover/bubble:max-h-12 group-hover/bubble:opacity-100 group-hover/bubble:mt-1.5"
                   )}>
+                    
                     <div className="pt-1.5 border-t border-white/5 flex items-center gap-0.5">
                       <button 
                         title="React"
@@ -573,6 +577,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                         </button>
                       )}
                     </div>
+
                   </div>
                 </>
               )}
@@ -603,8 +608,8 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
         {/* Child Comments */}
         {post.children && post.children.length > 0 && (
-          <div className="flex flex-col">
-            {post.children.map((child: any, idx: number) => renderPost(child, idx, depth + 1))}
+          <div className="flex flex-col w-full">
+            {post.children.map((child: any, idx: number) => renderPost(child, idx, depth + 1, false, false, isOnRight))}
           </div>
         )}
       </div>
@@ -686,7 +691,6 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           <button onClick={onMenuClick} className="p-2 -ml-2 hover:bg-secondary rounded-full">
             <Menu size={20} className="text-primary" />
           </button>
-          <img src="/logo.webp" alt="FreedomSpeech Logo" className="w-6 h-6 object-contain" />
           <h2 className="text-sm font-black tracking-tighter uppercase">{groupName}</h2>
         </div>
       </header>
