@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY, 
   username TEXT,
   password TEXT,
+  fcm_token TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

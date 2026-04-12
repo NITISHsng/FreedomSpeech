@@ -304,6 +304,28 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       });
 
       if (postData) {
+        // Send Notification if it's a reply or comment
+        if (targetId) {
+          try {
+            const recipientUserId = targetId === replyingTo?.id ? replyingTo.user_id : commentingTo?.user_id;
+            const recipientProfile = await fetchAPI(`/api/profiles/${recipientUserId}`);
+
+            if (recipientProfile?.fcm_token) {
+              await fetch("/api/send-notification", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  token: recipientProfile.fcm_token,
+                  title: commentingTo ? "New Thread Comment 💬" : "New Reply 🔥",
+                  body: `${profile?.username || 'Ghost'} replied: ${newPost.substring(0, 50)}${newPost.length > 50 ? '...' : ''}`,
+                }),
+              });
+            }
+          } catch (notifyErr) {
+            console.error("Failed to send notification:", notifyErr);
+          }
+        }
+
         setNewPost('');
         setReplyingTo(null);
         setCommentingTo(null);
@@ -399,10 +421,12 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     return rootNodes;
   };
 
+  const firstUnreadId = posts.find(p => p.user_id !== userId && new Date(p.created_at).getTime() > initialLastSeen.current)?.id;
+
   const renderPost = (post: any, index: number, depth = 0, isSameUserAsPrev = false, showDateHeader = false, parentOnRight = false) => {
     const isOnRight = depth === 0 ? post.user_id === userId : parentOnRight;
     const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
-    const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1]?.created_at).getTime() <= initialLastSeen.current);
+    const isFirstNew = post.id === firstUnreadId;
     const hasThreadFlag = post.content?.startsWith('[THREAD]');
     const content = hasThreadFlag ? post.content.replace('[THREAD]', '').trim() : post.content;
     const isDeleted = post.is_deleted || content === '[DELETED]';

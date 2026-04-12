@@ -290,7 +290,7 @@ app.post('/api/reactions', async (req, res) => {
 app.get('/api/profiles/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('username, password')
+    .select('username, password, fcm_token')
     .eq('id', req.params.id)
     .maybeSingle();
   
@@ -300,10 +300,10 @@ app.get('/api/profiles/:id', async (req, res) => {
 
 // Update or Create profile
 app.post('/api/profiles', async (req, res) => {
-  const { id, username, password } = req.body;
+  const { id, username, password, fcm_token } = req.body;
   const { data, error } = await supabase
     .from('profiles')
-    .upsert({ id, username, password })
+    .upsert({ id, username, password, fcm_token })
     .select()
     .maybeSingle();
 
