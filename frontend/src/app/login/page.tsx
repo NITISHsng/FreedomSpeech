@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ghost, ArrowRight, Zap, Loader2, AlertCircle, Key, UserPlus, ChevronLeft } from 'lucide-react';
+import { Ghost, ArrowRight, Zap, Loader2, AlertCircle, Key, UserPlus, ChevronLeft, RefreshCw } from 'lucide-react';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
@@ -125,11 +125,27 @@ export default function LoginPage() {
               <motion.div key="new" initial={{ opacity: 1, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="space-y-6">
                 <div className="p-5 rounded-2xl bg-secondary/20 border border-border/30 space-y-3 font-mono">
                   <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Ghost Identity</span>
-                  <div className="text-[9px] md:text-[10px] bg-background/50 p-3 rounded-lg border border-border/20 break-all leading-relaxed text-primary">
-                    {displayId || "GENERATING..."}
+                  <div className="relative group">
+                    <input 
+                      value={displayId}
+                      onChange={(e) => setDisplayId(e.target.value)}
+                      placeholder="Ghost Identity"
+                      className="w-full text-[9px] md:text-[10px] bg-background/50 p-3 pr-10 rounded-lg border border-border/20 break-all leading-relaxed text-primary outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                    />
+                    <button 
+                      onClick={() => setDisplayId(getTimestampedId())}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/10 rounded-md"
+                      title="Regenerate ID"
+                    >
+                      <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+                    </button>
                   </div>
                 </div>
-                <button onClick={handleJoinNew} disabled={loading} className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-primary/90 transition-all shadow-xl">
+                <button 
+                  onClick={handleJoinNew} 
+                  disabled={loading || !displayId.trim()} 
+                  className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl"
+                >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Enter Portal <ArrowRight size={18} /></>}
                 </button>
               </motion.div>

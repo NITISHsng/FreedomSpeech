@@ -422,7 +422,7 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
               </button>
               <button 
                 onClick={() => {
-                  localStorage.removeItem('freedom_user_id');
+                  localStorage.clear();
                   window.location.href = '/login';
                 }} 
                 className="p-1.5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-lg transition-colors"
