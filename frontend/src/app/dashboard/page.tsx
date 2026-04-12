@@ -173,6 +173,7 @@ export default function Dashboard() {
                     onClick={() => setIsSidebarOpen(true)}
                     className="md:hidden px-8 py-3.5 bg-white text-black font-bold uppercase tracking-widest text-[11px] rounded-full shadow-xl hover:scale-105 transition-transform"
                   >
+                    
                     Open Menu
                   </button>
                   <div className="hidden md:flex items-center gap-3 bg-secondary/50 rounded-full px-6 py-3 border border-border">
