@@ -42,6 +42,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeReactionPicker, setActiveReactionPicker] = useState<string | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Post | null>(null);
   const [commentingTo, setCommentingTo] = useState<Post | null>(null);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -428,6 +429,17 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           initial={{ opacity: 0, scale: 0.98 }} 
           animate={{ opacity: 1, scale: 1 }} 
           whileHover={{ scale: 1.005 }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.6}
+          onDragEnd={(_, info) => {
+            if (Math.abs(info.offset.x) > 80) {
+              setCommentingTo(null);
+              setReplyingTo(post);
+              scrollToBottom(true);
+              document.querySelector('textarea')?.focus();
+            }
+          }}
           className={cn(
             depth > 0 ? "max-w-full" : "max-w-[85%] md:max-w-xl group flex flex-col relative transition-all duration-300", 
             post.user_id === userId && depth === 0 ? "ml-auto items-end text-right" : "mr-auto items-start text-left",
@@ -441,7 +453,18 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             </div>
           )}
 
-          <div className={cn("relative group/bubble", depth > 0 ? "w-full" : "max-w-full")}>
+          <div 
+            className={cn("relative group/bubble", depth > 0 ? "w-full" : "max-w-full")}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setActiveMessageId(activeMessageId === post.id ? null : post.id);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setActiveMessageId(activeMessageId === post.id ? null : post.id);
+            }}
+          >
             <div className={cn("px-2 py-1.5 rounded-xl shadow-md text-[13px] transition-all min-w-[60px] overflow-hidden relative", post.user_id === userId ? "bg-primary text-white shadow-primary/20 rounded-tr-none border border-white/10" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40")}>
               {post.is_edited && !isDeleted && (
                 <span className={cn(
@@ -496,7 +519,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
                   <div className={cn(
                     "overflow-hidden transition-all duration-300 ease-in-out",
-                    (commentingTo?.id === post.id || replyingTo?.id === post.id) 
+                    (commentingTo?.id === post.id || replyingTo?.id === post.id || activeMessageId === post.id) 
                       ? "max-h-12 opacity-100 mt-1.5" 
                       : "max-h-0 opacity-0 group-hover/bubble:max-h-12 group-hover/bubble:opacity-100 group-hover/bubble:mt-1.5"
                   )}>
@@ -672,7 +695,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary blur-[120px] rounded-full" />
       </div>
 
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 custom-scrollbar">
+      <div ref={scrollRef} onScroll={handleScroll} onClick={() => setActiveMessageId(null)} className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 custom-scrollbar">
         <AnimatePresence initial={false}>
           {threadedPosts.map((post, index) => {
             const currentDate = new Date(post.created_at).toDateString();

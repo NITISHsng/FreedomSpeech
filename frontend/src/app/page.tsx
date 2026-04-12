@@ -37,7 +37,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="relative z-10 container mx-auto px-6 pb-32 text-center">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          // initial={{ opacity: 1, md:opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
