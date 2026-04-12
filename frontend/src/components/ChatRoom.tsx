@@ -51,6 +51,24 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
+        const target = event.target as HTMLElement;
+        // Check if we clicked the trigger button itself to avoid double-toggling
+        if (!target.closest('.reaction-trigger')) {
+          setActiveReactionPicker(null);
+        }
+      }
+    };
+
+    if (activeReactionPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeReactionPicker]);
   
   // Auto-resize textarea
   useEffect(() => {
@@ -536,14 +554,14 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                   )}>
                     
                     <div className="pt-1.5 border-t border-white/5 flex items-center gap-0.5">
-                      <button 
-                        title="React"
-                        onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} 
-                        className={cn(
-                          "p-1.5 rounded-lg transition-all",
-                          post.user_reaction ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-white/5 hover:text-primary"
-                        )}
-                      >
+                        <button 
+                          title="React"
+                          onClick={() => setActiveReactionPicker(activeReactionPicker === post.id ? null : post.id)} 
+                          className={cn(
+                            "p-1.5 rounded-lg transition-all reaction-trigger",
+                            post.user_reaction ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-white/5 hover:text-primary"
+                          )}
+                        >
                         <Smile size={12} />
                       </button>
                       <button 
@@ -598,7 +616,13 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
             <AnimatePresence>
               {activeReactionPicker === post.id && (
-                <motion.div initial={{ opacity: 0, scale: 0.9, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 5 }} className={cn("absolute bottom-full mb-3 z-50 flex gap-1 p-1 bg-card border border-border rounded-xl shadow-2xl", post.user_id === userId && depth === 0 ? "right-0" : "left-0")}>
+                <motion.div 
+                  ref={reactionPickerRef}
+                  initial={{ opacity: 0, scale: 0.9, y: 5 }} 
+                  animate={{ opacity: 1, scale: 1, y: 0 }} 
+                  exit={{ opacity: 0, scale: 0.9, y: 5 }} 
+                  className={cn("absolute bottom-full mb-3 z-50 flex gap-1 p-1 bg-card border border-border rounded-xl shadow-2xl", post.user_id === userId && depth === 0 ? "right-0" : "left-0")}
+                >
                   {EMOJI_OPTIONS.map(emoji => <button key={emoji} onClick={() => handleToggleReaction(post.id, emoji)} className="w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:bg-primary/10">{emoji}</button>)}
                 </motion.div>
               )}
