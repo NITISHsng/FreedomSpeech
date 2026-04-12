@@ -304,28 +304,6 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
       });
 
       if (postData) {
-        // Send Notification if it's a reply or comment
-        if (targetId) {
-          try {
-            const recipientUserId = targetId === replyingTo?.id ? replyingTo.user_id : commentingTo?.user_id;
-            const recipientProfile = await fetchAPI(`/api/profiles/${recipientUserId}`);
-
-            if (recipientProfile?.fcm_token) {
-              await fetch("/api/send-notification", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  token: recipientProfile.fcm_token,
-                  title: commentingTo ? "New Thread Comment 💬" : "New Reply 🔥",
-                  body: `${profile?.username || 'Ghost'} replied: ${newPost.substring(0, 50)}${newPost.length > 50 ? '...' : ''}`,
-                }),
-              });
-            }
-          } catch (notifyErr) {
-            console.error("Failed to send notification:", notifyErr);
-          }
-        }
-
         setNewPost('');
         setReplyingTo(null);
         setCommentingTo(null);
@@ -421,12 +399,10 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     return rootNodes;
   };
 
-  const firstUnreadId = posts.find(p => p.user_id !== userId && new Date(p.created_at).getTime() > initialLastSeen.current)?.id;
-
   const renderPost = (post: any, index: number, depth = 0, isSameUserAsPrev = false, showDateHeader = false, parentOnRight = false) => {
     const isOnRight = depth === 0 ? post.user_id === userId : parentOnRight;
     const isNew = new Date(post.created_at).getTime() > initialLastSeen.current && post.user_id !== userId;
-    const isFirstNew = post.id === firstUnreadId;
+    const isFirstNew = isNew && (index === 0 || new Date(posts[index - 1]?.created_at).getTime() <= initialLastSeen.current);
     const hasThreadFlag = post.content?.startsWith('[THREAD]');
     const content = hasThreadFlag ? post.content.replace('[THREAD]', '').trim() : post.content;
     const isDeleted = post.is_deleted || content === '[DELETED]';
@@ -435,17 +411,17 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
     return (
       <div key={`post-container-${post.id}`} className={cn("flex flex-col", depth > 0 ? (isOnRight ? `mr-2 md:mr-4 border-r-2 ${threadColor} pr-2.5 py-0.5 mt-0.5` : `ml-2 md:ml-4 border-l-2 ${threadColor} pl-2.5 py-0.5 mt-0.5`) : (index > 0 ? (isSameUserAsPrev ? "mt-0.5" : "mt-2.5") : ""), isOnRight && "items-end")}>
+        {showDateHeader && depth === 0 && (
+           <div className="flex justify-center mb-4 mt-1 w-full">
+            <span className="px-3 py-1 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
+          </div>
+        )}
         {isFirstNew && depth === 0 && (
           <div ref={firstUnreadRef} className="flex justify-center my-4 relative">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-primary/30"></div></div>
             <span className="relative px-3 py-1 rounded-full bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 shadow-sm">
               Unread Messages
             </span>
-          </div>
-        )}
-        {showDateHeader && depth === 0 && (
-           <div className="flex justify-center mb-4 mt-1 w-full">
-            <span className="px-3 py-1 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{formatDateLabel(post.created_at)}</span>
           </div>
         )}
         
