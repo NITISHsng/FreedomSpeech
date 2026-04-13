@@ -555,7 +555,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                         post.user_id === userId ? "border-white/30" : "border-primary/50"
                       )}
                     >
-                      <span className="font-bold opacity-80 uppercase text-[8px]">{post.reply_to.profiles?.username}</span>
+                      <span className="font-bold text-sky-400 uppercase text-[8px]">{post.reply_to.profiles?.username}</span>
                       <p className="line-clamp-1 italic opacity-70">{post.reply_to.content}</p>
                     </div>
                   )}
@@ -680,6 +680,21 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                   className={cn("absolute bottom-full mb-3 z-50 flex gap-1 p-1 bg-card border border-border rounded-xl shadow-2xl", post.user_id === userId && depth === 0 ? "right-0" : "left-0")}
                 >
                   {EMOJI_OPTIONS.map(emoji => <button key={emoji} onClick={() => handleToggleReaction(post.id, emoji)} className="w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:bg-primary/10">{emoji}</button>)}
+                  <div className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 overflow-hidden cursor-pointer" title="Add custom device emoji">
+                    <Plus size={16} className="text-muted-foreground pointer-events-none" />
+                    <input 
+                      type="text" 
+                      className="absolute inset-0 opacity-0 cursor-pointer" 
+                      onChange={(e) => {
+                        const val = Array.from(e.target.value);
+                        if (val.length > 0) {
+                           const emoji = val[val.length - 1];
+                           handleToggleReaction(post.id, emoji);
+                           e.target.value = '';
+                        }
+                      }}
+                    />
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
