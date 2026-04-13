@@ -109,6 +109,31 @@ app.post('/api/groups/unread', async (req, res) => {
   }
 });
 
+// Fetch unique visitor (poster) counts per group
+app.get('/api/groups/visitors', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('group_id, user_id');
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    const visitorMap = {};
+    const seen = {};
+    data.forEach(row => {
+      const key = `${row.group_id}::${row.user_id}`;
+      if (!seen[key]) {
+        seen[key] = true;
+        visitorMap[row.group_id] = (visitorMap[row.group_id] || 0) + 1;
+      }
+    });
+
+    res.json(visitorMap);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Fetch all groups
 app.get('/api/groups', async (req, res) => {
   const { data, error } = await supabase.from('groups').select('*');

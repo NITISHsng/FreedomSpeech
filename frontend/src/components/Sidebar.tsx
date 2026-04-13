@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { socket, fetchAPI } from '@/lib/api';
 import { 
   Zap, Plus, Loader2, X, ArrowRight, Settings, 
-  Search, History, Globe, LogOut 
+  Search, History, Globe, LogOut, Users 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -38,6 +38,7 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
   const [searchTerm, setSearchTerm] = useState('');
   const [recencyMap, setRecencyMap] = useState<Record<string, number>>({});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [visitorCounts, setVisitorCounts] = useState<Record<string, number>>({});
   const [globalTyping, setGlobalTyping] = useState<Record<string, string[]>>({});
   
   const [hasMounted, setHasMounted] = useState(false);
@@ -75,6 +76,21 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
       socket.off('groups_changed', handleGroupsChanged);
     };
   }, [fetchGroups]);
+
+  const fetchVisitorCounts = useCallback(async () => {
+    try {
+      const data = await fetchAPI('/api/groups/visitors');
+      if (data) setVisitorCounts(data);
+    } catch (err) {
+      console.error('Failed to fetch visitor counts:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVisitorCounts();
+    socket.on('refresh_posts', fetchVisitorCounts);
+    return () => { socket.off('refresh_posts', fetchVisitorCounts); };
+  }, [fetchVisitorCounts]);
 
   const fetchUnreadCounts = useCallback(async () => {
     if (Object.keys(recencyMap).length === 0) return;
@@ -280,11 +296,13 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
             <button
               onClick={() => setIsInputVisible(!isInputVisible)}
               className={cn(
-                "p-1.5 rounded-lg transition-all duration-200",
-                isInputVisible ? "bg-destructive/10 text-destructive rotate-90" : "bg-primary/10 text-primary hover:bg-primary hover:text-white"
+                "p-2 rounded-xl transition-all duration-200 shadow-sm",
+                isInputVisible 
+                  ? "bg-destructive/10 text-destructive rotate-90 ring-1 ring-destructive/30" 
+                  : "bg-primary text-white hover:bg-primary/80 ring-2 ring-primary/30 hover:ring-primary/50"
               )}
             >
-              {isInputVisible ? <X size={14} /> : <Plus size={14} />}
+              {isInputVisible ? <X size={16} strokeWidth={3} /> : <Plus size={16} strokeWidth={3} />}
             </button>
           </div>
 
@@ -370,6 +388,15 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
                       )}>
                         {group.name}
                       </span>
+                      {visitorCounts[group.id] > 0 && (
+                        <span className={cn(
+                          "text-[9px] font-semibold flex items-center gap-1 mt-0.5",
+                          isActive ? "text-white/60" : "text-muted-foreground/70"
+                        )}>
+                          <Users size={9} />
+                          {visitorCounts[group.id]}
+                        </span>
+                      )}
                       {isVisited && !isActive && (
                         <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest mt-0.5">
                           {globalTyping[group.id]?.length > 0 
