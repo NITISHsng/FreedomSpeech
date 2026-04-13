@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatRoom } from '@/components/ChatRoom';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 import { Plus, AlertCircle } from 'lucide-react';
 import { fetchAPI } from '@/lib/api';
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const sharedGroupId = searchParams.get('groupId');
   const { userId, isLoaded } = useAnonymousUser({ autoRegister: false });
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(sharedGroupId);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -52,7 +54,9 @@ export default function Dashboard() {
         }
       });
 
-      if (lastVisitedId && groups.some((g: any) => g.id === lastVisitedId)) {
+      if (sharedGroupId && groups.some((g: any) => g.id === sharedGroupId)) {
+        setActiveGroupId(sharedGroupId);
+      } else if (lastVisitedId && groups.some((g: any) => g.id === lastVisitedId)) {
         setActiveGroupId(lastVisitedId);
       } else {
         setActiveGroupId(null);
@@ -186,5 +190,13 @@ export default function Dashboard() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-background"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

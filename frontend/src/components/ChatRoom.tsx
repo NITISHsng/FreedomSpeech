@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { socket, fetchAPI } from '@/lib/api';
-import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, Pencil, Check } from 'lucide-react';
+import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, Pencil, Check, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
@@ -59,6 +60,8 @@ interface ChatRoomProps {
 }
 
 export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
+  const searchParams = useSearchParams();
+  const sharedMessageId = searchParams?.get('messageId');
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState('');
   const { profile } = useAnonymousUser();
@@ -189,18 +192,22 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
     // Initial Load Logic
     if (isInitialLoad.current) {
-      const hasUnread = posts.some(p => p.user_id !== userId && new Date(p.created_at).getTime() > initialLastSeen.current);
-      if (hasUnread) {
-        // Direct jump to first unread message without animation
-        setTimeout(() => {
-          if (firstUnreadRef.current) {
-            firstUnreadRef.current.scrollIntoView({ behavior: 'auto', block: 'start' });
-          } else {
-            scrollToBottom(false);
-          }
-        }, 50);
+      if (sharedMessageId && posts.some(p => p.id === sharedMessageId)) {
+        setTimeout(() => jumpToMessage(sharedMessageId), 100);
       } else {
-        scrollToBottom(false);
+        const hasUnread = posts.some(p => p.user_id !== userId && new Date(p.created_at).getTime() > initialLastSeen.current);
+        if (hasUnread) {
+          // Direct jump to first unread message without animation
+          setTimeout(() => {
+            if (firstUnreadRef.current) {
+              firstUnreadRef.current.scrollIntoView({ behavior: 'auto', block: 'start' });
+            } else {
+              scrollToBottom(false);
+            }
+          }, 50);
+        } else {
+          scrollToBottom(false);
+        }
       }
       isInitialLoad.current = false;
       lastPostCount.current = posts.length;
@@ -603,6 +610,29 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                         className="p-1.5 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-primary transition-all"
                       >
                         <MessageSquare size={12} />
+                      </button>
+                      <button 
+                        title="Share"
+                        onClick={async () => {
+                          const url = `${window.location.origin}/dashboard?groupId=${groupId}&messageId=${post.id}`;
+                          const shareData = {
+                            title: 'Freedom Speech',
+                            text: 'Check out this message on Freedom Speech:',
+                            url: url,
+                          };
+                          try {
+                            if (navigator.share) {
+                              await navigator.share(shareData);
+                            } else {
+                              await navigator.clipboard.writeText(url);
+                            }
+                          } catch (err) {
+                            console.error('Error sharing', err);
+                          }
+                        }} 
+                        className="p-1.5 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-emerald-400 transition-all"
+                      >
+                        <Share2 size={12} />
                       </button>
                       {post.user_id === userId && (
                         <button 
