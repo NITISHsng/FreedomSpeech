@@ -10,6 +10,30 @@ import { useAnonymousUser } from '@/hooks/useAnonymousUser';
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
+const USER_COLORS = [
+  'text-rose-400',
+  'text-emerald-400',
+  'text-amber-400',
+  'text-sky-400',
+  'text-violet-400',
+  'text-orange-400',
+  'text-fuchsia-400',
+  'text-lime-400',
+  'text-cyan-400',
+  'text-indigo-400'
+];
+
+const getUserColor = (userId: string) => {
+  if (!userId) return 'text-indigo-400';
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % USER_COLORS.length;
+  return USER_COLORS[index];
+};
+
+
 interface Post {
   id: string;
   user_id: string;
@@ -473,14 +497,8 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             highlightedPost === post.id && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg scale-[1.02] z-50 shadow-[0_0_30px_rgba(59,130,246,0.3)] bg-primary/5"
           )}
         >
-          {(post.user_id !== userId || depth > 0) && !isSameUserAsPrev && (
-            <div className={cn("flex items-center gap-1.5 mb-0.5 px-1.5", isOnRight && "flex-row-reverse")}>
-              <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-wider drop-shadow-sm">
-                {post.user_id === userId ? "You" : post.profiles?.username}
-              </span>
-              <span className="w-1 h-1 rounded-full bg-slate-600" />
-            </div>
-          )}
+          {/* Username removed from here and moved inside the bubble below */}
+
 
           <div 
             className={cn("relative group/bubble", depth > 0 ? "w-full" : "max-w-full")}
@@ -494,7 +512,15 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
               setActiveMessageId(activeMessageId === post.id ? null : post.id);
             }}
           >
-            <div className={cn("px-2 py-1.5 rounded-xl shadow-md text-[13px] transition-all overflow-hidden relative", post.user_id === userId ? "bg-[#0F172D] w-fit  text-white shadow-primary/20 rounded-tr-none border border-white/10 ml-auto" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40 mr-auto")}>
+            <div className={cn("px-3 py-2 rounded-2xl shadow-md text-[13px] transition-all overflow-hidden relative", post.user_id === userId ? "bg-[#0F172D] w-fit text-white shadow-primary/20 rounded-tr-none border border-white/10 ml-auto" : "bg-[#0F172A] text-slate-200 border border-white/5 rounded-tl-none shadow-black/40 mr-auto")}>
+              {(post.user_id !== userId || depth > 0) && !isSameUserAsPrev && (
+                <div className={cn(
+                  "text-[10px] font-black uppercase tracking-wider mb-1 flex items-center gap-1.5 select-none",
+                  post.user_id === userId ? "text-yellow-500" : getUserColor(post.user_id)
+                )}>
+                  {post.user_id === userId ? "You" : post.profiles?.username}
+                </div>
+              )}
               {post.is_edited && !isDeleted && (
                 <span className={cn(
                   "absolute top-1 right-1.5 text-[7px] font-black uppercase tracking-tighter",
@@ -849,7 +875,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           )}
         </AnimatePresence>
 
-        <div className="max-w-4xl w-full mx-auto flex items-end gap-2 bg-secondary/30 p-2 rounded-2xl border border-border/50 relative">
+        <div className="max-w-4xl w-full mx-auto flex items-end gap-2 bg-secondary/30 p-2 rounded-2xl border border-border/50 min-h-[60px] relative">
           <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -861,6 +887,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
           <textarea
             ref={textareaRef}
             value={newPost}
+            rows={1}
             onChange={(e) => {
               setNewPost(e.target.value);
               if (groupId && profile?.username) {
@@ -873,7 +900,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             }}
             disabled={!userId}
             placeholder={selectedFiles.length > 0 ? "Add a caption..." : "Ghost says..."}
-            className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm py-2 px-1 resize-none min-h-[44px] max-h-[120px] transition-all duration-200"
+            className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm py-3 px-2 resize-none min-h-[44px] transition-all duration-200 custom-scrollbar"
           />
           <button 
             onClick={handleSend} 
