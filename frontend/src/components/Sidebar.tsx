@@ -158,6 +158,9 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
         g.slug.toLowerCase().includes(searchTerm.toLowerCase())
       )
       .sort((a, b) => {
+        if (a.slug === 'freedom-speech-team') return -1;
+        if (b.slug === 'freedom-speech-team') return 1;
+
         const timeA = recencyMap[a.id] || 0;
         const timeB = recencyMap[b.id] || 0;
         if (timeA !== timeB) return timeB - timeA;
@@ -334,6 +337,7 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
               filteredGroups.map((group) => {
                 const isVisited = !!recencyMap[group.id];
                 const isActive = activeGroupId === group.id;
+                const isTeamGroup = group.slug === 'freedom-speech-team';
                 
                 return (
                   <button
@@ -350,13 +354,14 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
                   >
                     <div className={cn(
                       "w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-transform duration-300 group-hover:scale-105 shadow-sm",
+                      isTeamGroup ? "bg-gradient-to-tr from-rose-500 to-purple-600 text-white shadow-lg border-0" :
                       isActive
                         ? "bg-white/20 text-white shadow-inner"
                         : isVisited
                           ? "bg-background text-foreground border border-border/50"
                           : "bg-primary/10 text-primary border border-primary/20"
                     )}>
-                      {group.name.substring(0, 2).toUpperCase()}
+                      {isTeamGroup ? <Zap size={14} className="text-white drop-shadow-md" /> : group.name.substring(0, 2).toUpperCase()}
                     </div>
                     <div className="flex flex-col items-start overflow-hidden text-left flex-1 min-w-0">
                       <span className={cn(

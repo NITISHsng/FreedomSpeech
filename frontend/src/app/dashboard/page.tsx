@@ -36,7 +36,19 @@ function DashboardContent() {
         try { recencyMap = JSON.parse(recencyStr); } catch(e) {}
       }
 
-      const groups = await fetchAPI('/api/groups');
+      let groups = await fetchAPI('/api/groups');
+      const feedbackSlug = 'freedom-speech-team';
+      if (groups && !groups.some((g: any) => g.slug === feedbackSlug)) {
+        try {
+          const feedbackGroup = await fetchAPI('/api/groups', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Freedom Speech Team', slug: feedbackSlug, description: 'Suggest new features or report issues to the team here.' })
+          });
+          if (feedbackGroup) groups.push(feedbackGroup);
+        } catch (e) {
+          console.error('Failed to bootstrap feedback group:', e);
+        }
+      }
       
       if (!groups || groups.length === 0) {
         setError('No communities found. Please create your first community below.');
