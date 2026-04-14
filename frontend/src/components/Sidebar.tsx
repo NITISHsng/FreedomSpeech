@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { socket, fetchAPI } from '@/lib/api';
 import { 
   Zap, Plus, Loader2, X, ArrowRight, Settings, 
-  Search, History, Globe, LogOut, Users 
+  Search, History, Globe, LogOut, Users, Share2 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -410,11 +410,41 @@ export function Sidebar({ isOpen, onClose, activeGroupId, onGroupSelect, userId 
                         </span>
                       )}
                     </div>
-                    {unreadCounts[group.id] > 0 && !isActive && (
-                      <div className="shrink-0 bg-primary/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/30">
-                        {unreadCounts[group.id]}
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      {unreadCounts[group.id] > 0 && !isActive && (
+                        <div className="bg-primary/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/30">
+                          {unreadCounts[group.id]}
+                        </div>
+                      )}
+                      <div
+                        role="button"
+                        title={`Share ${group.name}`}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const url = `${window.location.origin}/dashboard?groupId=${group.id}`;
+                          const shareData = {
+                            title: `${group.name} - FreedomSpeech`,
+                            text: `Join the "${group.name}" community on FreedomSpeech:`,
+                            url,
+                          };
+                          try {
+                            if (navigator.share) {
+                              await navigator.share(shareData);
+                            } else {
+                              await navigator.clipboard.writeText(url);
+                            }
+                          } catch (err) {
+                            console.error('Share error:', err);
+                          }
+                        }}
+                        className={cn(
+                          "p-1.5 rounded-lg transition-all",
+                          isActive ? "text-white/50 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                        )}
+                      >
+                        <Share2 size={12} />
                       </div>
-                    )}
+                    </div>
                   </button>
                 );
               })
