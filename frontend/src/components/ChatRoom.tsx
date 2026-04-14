@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { socket, fetchAPI } from '@/lib/api';
-import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, Pencil, Check, Share2 } from 'lucide-react';
+import { Send, Smile, User, Loader2, Plus, Menu, Reply, X, Image as ImageIcon, ImagePlus, Maximize2, Trash2, ArrowDown, MessageSquare, Pencil, Check, Share2, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAnonymousUser } from '@/hooks/useAnonymousUser';
@@ -79,6 +79,12 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
+
+  // Poll state
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [pollLoading, setPollLoading] = useState(false);
   
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -463,6 +469,11 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
     const hasThreadFlag = post.content?.startsWith('[THREAD]');
     const content = hasThreadFlag ? post.content.replace('[THREAD]', '').trim() : post.content;
     const isDeleted = post.is_deleted || content === '[DELETED]';
+    const isPoll = post.content?.startsWith('[POLL]');
+    let pollData: any = null;
+    if (isPoll) {
+      try { pollData = JSON.parse(post.content.replace('[POLL]', '')); } catch (e) {}
+    }
 
     const threadColor = THREAD_COLORS[depth % THREAD_COLORS.length];
 
@@ -560,24 +571,86 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                     </div>
                   )}
 
-                  {/* Image Gallery */}
-                  {post.media_urls && post.media_urls.length > 0 && (
-                    <div className={cn(
-                      "mb-2 grid gap-1 rounded-lg overflow-hidden cursor-pointer max-w-[150px]",
-                      post.media_urls.length === 1 ? "grid-cols-1" : "grid-cols-2"
-                    )}>
-                      {post.media_urls.map((url: string, i: number) => (
-                        <div key={i} onClick={() => setLightboxImage(url)} className={cn("relative group/img", post.media_urls!.length === 3 && i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-square")}>
-                          <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                            <Maximize2 size={16} className="text-white drop-shadow-lg" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {isPoll && pollData ? (
+                    <div className="w-full min-w-[220px] max-w-[320px]">
+                      <div className="flex items-center gap-2 mb-3">
+                        <BarChart3 size={14} className="text-primary shrink-0" />
+                        <p className="text-[13px] font-bold leading-snug">{pollData.question}</p>
+                      </div>
+                      <div className="space-y-2">
+                        {pollData.options.map((opt: any, optIdx: number) => {
+                          const totalVotes = pollData.total_votes || 0;
+                          const voteCount = opt.voters?.length || 0;
+                          const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                          const hasVoted = pollData.options.some((o: any) => o.voters?.includes(userId));
+                          const isMyVote = opt.voters?.includes(userId);
 
-                  <p className="leading-snug whitespace-pre-wrap pr-8 w-fit">{content}</p>
+                          return (
+                            <button
+                              key={optIdx}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await fetchAPI('/api/polls/vote', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ post_id: post.id, user_id: userId, option_index: optIdx })
+                                  });
+                                } catch (err) { console.error('Vote error:', err); }
+                              }}
+                              className={cn(
+                                "w-full relative overflow-hidden rounded-lg border text-left px-3 py-2 text-[12px] font-medium transition-all",
+                                isMyVote 
+                                  ? "border-primary/50 bg-primary/5" 
+                                  : "border-white/10 hover:border-white/20 bg-white/5"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "absolute inset-y-0 left-0 transition-all duration-500 rounded-lg",
+                                  isMyVote ? "bg-primary/20" : "bg-white/5"
+                                )}
+                                style={{ width: hasVoted ? `${percentage}%` : '0%' }}
+                              />
+                              <div className="relative z-10 flex items-center justify-between gap-2">
+                                <span className="truncate">{opt.text}</span>
+                                {hasVoted && (
+                                  <span className={cn(
+                                    "text-[10px] font-bold shrink-0",
+                                    isMyVote ? "text-primary" : "text-muted-foreground"
+                                  )}>
+                                    {percentage}%
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-2 font-medium">
+                        {pollData.total_votes || 0} vote{pollData.total_votes !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Image Gallery */}
+                      {post.media_urls && post.media_urls.length > 0 && (
+                        <div className={cn(
+                          "mb-2 grid gap-1 rounded-lg overflow-hidden cursor-pointer max-w-[150px]",
+                          post.media_urls.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                        )}>
+                          {post.media_urls.map((url: string, i: number) => (
+                            <div key={i} onClick={() => setLightboxImage(url)} className={cn("relative group/img", post.media_urls!.length === 3 && i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-square")}>
+                              <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                <Maximize2 size={16} className="text-white drop-shadow-lg" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="leading-snug whitespace-pre-wrap pr-8 w-fit">{content}</p>
+                    </>
+                  )}
 
                   <div className={cn(
                     "overflow-hidden transition-all duration-300 ease-in-out",
@@ -837,6 +910,94 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
 
       <div className="p-4 md:p-6 border-t border-border bg-card/50 backdrop-blur-xl relative z-20 flex flex-col gap-3">
         {/* Attachment Previews */}
+
+        {/* Poll Creator */}
+        <AnimatePresence>
+          {showPollCreator && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }} 
+              animate={{ height: 'auto', opacity: 1 }} 
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-secondary/30 rounded-2xl border border-border/50 p-4 overflow-hidden"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <BarChart3 size={16} className="text-primary" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-primary">Create Poll</h3>
+                </div>
+                <button onClick={() => { setShowPollCreator(false); setPollQuestion(''); setPollOptions(['', '']); }} className="p-1 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive">
+                  <X size={14} />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Ask a question..."
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                className="w-full bg-background/50 border border-border/50 rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:ring-1 focus:ring-primary/50"
+              />
+              <div className="space-y-2 mb-3">
+                {pollOptions.map((opt, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground w-5 shrink-0">{idx + 1}.</span>
+                    <input
+                      type="text"
+                      placeholder={`Option ${idx + 1}`}
+                      value={opt}
+                      onChange={(e) => {
+                        const updated = [...pollOptions];
+                        updated[idx] = e.target.value;
+                        setPollOptions(updated);
+                      }}
+                      className="flex-1 bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))} className="p-1 text-muted-foreground hover:text-destructive">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <button 
+                  onClick={() => setPollOptions([...pollOptions, ''])}
+                  className="text-[10px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-widest"
+                >
+                  <Plus size={12} /> Add Option
+                </button>
+                <button
+                  disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2 || pollLoading}
+                  onClick={async () => {
+                    setPollLoading(true);
+                    try {
+                      await fetchAPI('/api/polls', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          group_id: groupId,
+                          user_id: userId,
+                          question: pollQuestion.trim(),
+                          options: pollOptions.filter(o => o.trim()).map(o => o.trim())
+                        })
+                      });
+                      setShowPollCreator(false);
+                      setPollQuestion('');
+                      setPollOptions(['', '']);
+                    } catch (err) {
+                      console.error('Poll creation error:', err);
+                    } finally {
+                      setPollLoading(false);
+                    }
+                  }}
+                  className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                >
+                  {pollLoading ? <Loader2 size={12} className="animate-spin" /> : <BarChart3 size={12} />}
+                  Create Poll
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {selectedFiles.length > 0 && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
@@ -928,6 +1089,13 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             className={cn("p-3 rounded-xl transition-all", selectedFiles.length > 0 ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-secondary")}
           >
             <ImagePlus size={20} />
+          </button>
+          <button 
+            onClick={() => setShowPollCreator(!showPollCreator)}
+            disabled={loading}
+            className={cn("p-3 rounded-xl transition-all", showPollCreator ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-secondary")}
+          >
+            <BarChart3 size={20} />
           </button>
           <textarea
             ref={textareaRef}

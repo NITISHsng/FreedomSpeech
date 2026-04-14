@@ -369,6 +369,91 @@ app.get('/api/history', async (req, res) => {
   res.json(data || []);
 });
 
+// --- POLL ENDPOINTS ---
+
+// Create a poll (stored as a special post)
+app.post('/api/polls', async (req, res) => {
+  const { group_id, user_id, question, options } = req.body;
+  
+  if (!question || !options || options.length < 2) {
+    return res.status(400).json({ error: 'Question and at least 2 options required' });
+  }
+
+  const pollData = {
+    question,
+    options: options.map(text => ({ text, voters: [] })),
+    total_votes: 0
+  };
+
+  const content = `[POLL]${JSON.stringify(pollData)}`;
+
+  const { data, error } = await supabase
+    .from('posts')
+    .insert({ group_id, user_id, content })
+    .select()
+    .maybeSingle();
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  await supabase.from('history').insert({
+    user_id,
+    action_type: 'poll_created',
+    action_id: data.id,
+    metadata: { group_id, question }
+  });
+
+  io.to(group_id).emit('refresh_posts');
+  res.json(data);
+});
+
+// Vote on a poll
+app.post('/api/polls/vote', async (req, res) => {
+  const { post_id, user_id, option_index } = req.body;
+
+  try {
+    const { data: post, error: fetchErr } = await supabase
+      .from('posts')
+      .select('content, group_id')
+      .eq('id', post_id)
+      .maybeSingle();
+
+    if (fetchErr || !post) return res.status(404).json({ error: 'Poll not found' });
+    if (!post.content.startsWith('[POLL]')) return res.status(400).json({ error: 'Not a poll' });
+
+    const pollData = JSON.parse(post.content.replace('[POLL]', ''));
+
+    // Check if user already voted
+    const alreadyVoted = pollData.options.some(opt => opt.voters.includes(user_id));
+    if (alreadyVoted) {
+      // Remove previous vote
+      pollData.options.forEach(opt => {
+        opt.voters = opt.voters.filter(v => v !== user_id);
+      });
+      pollData.total_votes = Math.max(0, pollData.total_votes - 1);
+    }
+
+    // Add new vote
+    if (option_index >= 0 && option_index < pollData.options.length) {
+      pollData.options[option_index].voters.push(user_id);
+      pollData.total_votes += 1;
+    }
+
+    const newContent = `[POLL]${JSON.stringify(pollData)}`;
+    const { error: updateErr } = await supabase
+      .from('posts')
+      .update({ content: newContent })
+      .eq('id', post_id);
+
+    if (updateErr) throw updateErr;
+
+    io.to(post.group_id).emit('refresh_posts');
+    res.json({ success: true, pollData });
+  } catch (err) {
+    console.error('Poll vote error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- SOCKET HANDLERS ---
 io.on('connection', (socket) => {
   console.log(`🔌 New client connected: ${socket.id}`);
