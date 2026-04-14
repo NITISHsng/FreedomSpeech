@@ -727,6 +727,17 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                           onClick={() => { 
                             setReplyingTo(null); 
                             setCommentingTo(null); 
+                            if (post.content.startsWith('[POLL]')) {
+                              try {
+                                const poll = JSON.parse(post.content.replace('[POLL]', ''));
+                                setPollQuestion(poll.question);
+                                setPollOptions(poll.options.map((o: any) => o.text));
+                                setEditingPost(post);
+                                setShowPollCreator(true);
+                                scrollToBottom(true);
+                                return;
+                              } catch (e) { console.error('Error parsing poll for edit', e); }
+                            }
                             setEditingPost(post); 
                             setNewPost(content);
                             document.querySelector('textarea')?.focus();
@@ -936,10 +947,12 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <BarChart3 size={16} className="text-primary" />
-                  <h3 className="text-xs font-black uppercase tracking-widest text-primary">Create Poll</h3>
+                  <BarChart3 size={16} className={cn(editingPost?.content.startsWith('[POLL]') ? "text-amber-500" : "text-primary")} />
+                  <h3 className={cn("text-xs font-black uppercase tracking-widest", editingPost?.content.startsWith('[POLL]') ? "text-amber-500" : "text-primary")}>
+                    {editingPost?.content.startsWith('[POLL]') ? "Edit Poll" : "Create Poll"}
+                  </h3>
                 </div>
-                <button onClick={() => { setShowPollCreator(false); setPollQuestion(''); setPollOptions(['', '']); }} className="p-1 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive">
+                <button onClick={() => { setShowPollCreator(false); setPollQuestion(''); setPollOptions(['', '']); setEditingPost(null); }} className="p-1 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive">
                   <X size={14} />
                 </button>
               </div>
@@ -985,28 +998,72 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                   onClick={async () => {
                     setPollLoading(true);
                     try {
-                      await fetchAPI('/api/polls', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          group_id: groupId,
-                          user_id: userId,
+                      const isUpdate = !!editingPost && editingPost.content.startsWith('[POLL]');
+                      const optionsToSave = pollOptions.filter(o => o.trim()).map(o => o.trim());
+                      
+                      let pollDataToSave: any;
+                      if (isUpdate) {
+                        try {
+                          const oldPoll = JSON.parse(editingPost.content.replace('[POLL]', ''));
+                          // Map existing votes to options if text matches, or reset
+                          pollDataToSave = {
+                            question: pollQuestion.trim(),
+                            options: optionsToSave.map(text => {
+                              const existing = oldPoll.options.find((o: any) => o.text === text);
+                              return { text, voters: existing ? existing.voters : [] };
+                            }),
+                            total_votes: optionsToSave.reduce((acc, text) => {
+                                const existing = oldPoll.options.find((o: any) => o.text === text);
+                                return acc + (existing ? existing.voters.length : 0);
+                            }, 0)
+                          };
+                        } catch(e) { /* fallback if parse fails */ }
+                      }
+
+                      if (!pollDataToSave) {
+                        pollDataToSave = {
                           question: pollQuestion.trim(),
-                          options: pollOptions.filter(o => o.trim()).map(o => o.trim())
-                        })
-                      });
+                          options: optionsToSave.map(text => ({ text, voters: [] })),
+                          total_votes: 0
+                        };
+                      }
+
+                      const finalContent = `[POLL]${JSON.stringify(pollDataToSave)}`;
+
+                      if (isUpdate) {
+                        await fetchAPI(`/api/posts/${editingPost.id}`, {
+                          method: 'PATCH',
+                          body: JSON.stringify({ content: finalContent })
+                        });
+                      } else {
+                        await fetchAPI('/api/polls', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            group_id: groupId,
+                            user_id: userId,
+                            question: pollQuestion.trim(),
+                            options: optionsToSave
+                          })
+                        });
+                      }
+                      
                       setShowPollCreator(false);
                       setPollQuestion('');
                       setPollOptions(['', '']);
+                      setEditingPost(null);
                     } catch (err) {
-                      console.error('Poll creation error:', err);
+                      console.error('Poll operation error:', err);
                     } finally {
                       setPollLoading(false);
                     }
                   }}
-                  className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                  className={cn(
+                    "px-4 py-2 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2 shadow-lg",
+                    editingPost?.content.startsWith('[POLL]') ? "bg-amber-500 shadow-amber-500/20" : "bg-primary shadow-primary/20"
+                  )}
                 >
                   {pollLoading ? <Loader2 size={12} className="animate-spin" /> : <BarChart3 size={12} />}
-                  Create Poll
+                  {editingPost?.content.startsWith('[POLL]') ? "Update Poll" : "Create Poll"}
                 </button>
               </div>
             </motion.div>
