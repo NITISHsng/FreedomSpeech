@@ -59,6 +59,20 @@ interface ChatRoomProps {
   onMenuClick?: () => void;
 }
 
+const formatMessagePreview = (message: string) => {
+  if (!message) return '';
+  const text = message.replace('[THREAD]', '');
+  if (text.startsWith('[POLL]')) {
+    try {
+      const poll = JSON.parse(text.replace('[POLL]', ''));
+      return `📊 ${poll.question}`;
+    } catch (e) {
+      return '📊 Poll';
+    }
+  }
+  return text;
+};
+
 export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
   const searchParams = useSearchParams();
   const sharedMessageId = searchParams?.get('messageId');
@@ -567,7 +581,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                       )}
                     >
                       <span className="font-bold text-sky-400 uppercase text-[8px]">{post.reply_to.profiles?.username}</span>
-                      <p className="line-clamp-1 italic opacity-70">{post.reply_to.content}</p>
+                      <p className="line-clamp-1 italic opacity-70">{formatMessagePreview(post.reply_to.content)}</p>
                     </div>
                   )}
 
@@ -1028,7 +1042,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
                 <span className="text-[10px] font-bold uppercase text-indigo-500 flex items-center gap-1">
                   <MessageSquare size={10} /> Commenting on {commentingTo.profiles?.username}
                 </span>
-                <p className="text-xs text-muted-foreground truncate italic">{commentingTo.content.replace('[THREAD]', '')}</p>
+                <p className="text-xs text-muted-foreground truncate italic">{formatMessagePreview(commentingTo.content)}</p>
               </div>
               <button onClick={() => setCommentingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive shrink-0"><X size={14} /></button>
             </motion.div>
@@ -1040,7 +1054,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-primary/5 rounded-xl overflow-hidden border-l-4 border-primary p-3 flex justify-between items-center gap-3">
               <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-[10px] font-bold uppercase text-primary">Replying to {replyingTo.profiles?.username}</span>
-                <p className="text-xs text-muted-foreground truncate italic">{replyingTo.content}</p>
+                <p className="text-xs text-muted-foreground truncate italic">{formatMessagePreview(replyingTo.content)}</p>
               </div>
               <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive shrink-0"><X size={14} /></button>
             </motion.div>
@@ -1052,7 +1066,7 @@ export function ChatRoom({ groupId, userId, onMenuClick }: ChatRoomProps) {
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-amber-500/5 rounded-xl overflow-hidden border-l-4 border-amber-500 p-3 flex justify-between items-center gap-3">
               <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-[10px] font-bold uppercase text-amber-500">Editing Message</span>
-                <p className="text-xs text-muted-foreground truncate italic">{editingPost.content.replace('[THREAD]', '')}</p>
+                <p className="text-xs text-muted-foreground truncate italic">{formatMessagePreview(editingPost.content)}</p>
               </div>
               <button 
                 onClick={() => {
